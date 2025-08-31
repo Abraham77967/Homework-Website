@@ -206,6 +206,9 @@ async function handleAddHomework(e) {
 async function handleAddClass(e) {
     e.preventDefault();
     
+    console.log('Add class form submitted');
+    console.log('Current user:', currentUser);
+    
     if (!currentUser) {
         showNotification('Please sign in to add classes.', 'error');
         return;
@@ -214,6 +217,8 @@ async function handleAddClass(e) {
     try {
         const { db, collection, addDoc } = window.firebase;
         
+        console.log('Firebase objects:', { db, collection, addDoc });
+        
         const newClass = {
             userId: currentUser.id,
             name: document.getElementById('class-name').value,
@@ -221,9 +226,13 @@ async function handleAddClass(e) {
             createdAt: new Date().toISOString()
         };
         
+        console.log('New class data:', newClass);
+        
         // Add to Firestore
         const docRef = await addDoc(collection(db, 'classes'), newClass);
         newClass.id = docRef.id;
+        
+        console.log('Class added to Firestore with ID:', docRef.id);
         
         classes.push(newClass);
         renderClasses();
@@ -233,7 +242,12 @@ async function handleAddClass(e) {
         showNotification('Class added successfully!', 'success');
     } catch (error) {
         console.error('Error adding class:', error);
-        showNotification('Failed to add class. Please try again.', 'error');
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
+        showNotification(`Failed to add class: ${error.message}`, 'error');
     }
 }
 
