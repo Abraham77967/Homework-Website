@@ -1,98 +1,72 @@
 # Firebase Setup Guide
 
-## Step 1: Create a Firebase Project
+## Step 1: Access Firebase Console
+1. Go to: https://console.firebase.google.com/project/homework-website-25a85
+2. Sign in with your Google account
 
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Click "Create a project" or "Add project"
-3. Enter a project name (e.g., "homework-tracker")
-4. Choose whether to enable Google Analytics (optional)
-5. Click "Create project"
+## Step 2: Find Firestore Database
+1. In the left sidebar, look for the **"Build"** section
+2. You should see:
+   - Authentication
+   - **Firestore Database** ← Click this
+   - Realtime Database
+   - Storage
+   - Hosting
 
-## Step 2: Enable Authentication
+## Step 3: Create Firestore Database
+1. Click **"Firestore Database"**
+2. Click **"Create database"**
+3. Choose **"Start in test mode"** (allows all reads/writes for development)
+4. Select a **location** (choose the closest to you)
+5. Click **"Done"**
 
-1. In your Firebase project, click "Authentication" in the left sidebar
-2. Click "Get started"
-3. Go to the "Sign-in method" tab
-4. Click on "Google" provider
-5. Enable it and configure:
-   - Project support email: your email
-   - Project public-facing name: "Homework Tracker"
-6. Click "Save"
-
-## Step 3: Enable Firestore Database
-
-1. In your Firebase project, click "Firestore Database" in the left sidebar
-2. Click "Create database"
-3. Choose "Start in test mode" (for development)
-4. Select a location (choose closest to you)
-5. Click "Done"
-
-## Step 4: Get Your Firebase Config
-
-1. In your Firebase project, click the gear icon (⚙️) next to "Project Overview"
-2. Select "Project settings"
-3. Scroll down to "Your apps" section
-4. Click the web icon (</>)
-5. Register your app with a nickname (e.g., "homework-tracker-web")
-6. Copy the firebaseConfig object
-
-## Step 5: Update Your Application
-
-1. Open `index.html`
-2. Find the `firebaseConfig` object
-3. Replace it with your copied configuration
-
-## Step 6: Configure Security Rules (Optional)
-
-In Firestore Database > Rules, you can use these rules for development:
-
-```javascript
+## Step 4: Set Firestore Rules (IMPORTANT!)
+1. In Firestore, click **"Rules"** tab
+2. Replace the rules with this code:
+```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
 ```
+3. Click **"Publish"**
 
-## Step 7: Test Your Setup
+## Step 5: Verify Setup
+After creation, you should see:
+- A Firestore database interface
+- Collections will be empty initially
+- Rules will be set to "test mode"
 
-1. Run your application: `python server.py`
-2. Open `http://localhost:3000`
-3. Try signing in with Google
-4. Check the browser console for any errors
+## Step 6: Test the App
+1. Go to: http://localhost:3000
+2. Sign in with Google
+3. Try adding a class
+4. Check browser console for any errors
 
 ## Troubleshooting
 
-### "auth/configuration-not-found" Error
-- Make sure you've copied the correct Firebase config
-- Verify your project ID matches exactly
-- Check that Authentication is enabled
+### If you get "Failed to load your data":
+1. **Check Firestore Rules** - Make sure they allow read/write
+2. **Check browser console** for specific error messages
+3. **Try refreshing the page**
+4. **Sign out and sign back in**
 
-### "auth/unauthorized-domain" Error
-- In Firebase Console > Authentication > Settings > Authorized domains
-- Add `localhost` for development
-- Add your production domain when deploying
+### If you don't see "Firestore Database":
+1. Make sure you're in the correct Firebase project
+2. Try refreshing the page
+3. Check if you have the necessary permissions
 
-### "permission-denied" Error
-- Check your Firestore security rules
-- Make sure you're signed in before trying to read/write data
+### If you see "Realtime Database" instead:
+- Realtime Database and Firestore Database are different services
+- We need Firestore Database for this app
+- Look for "Firestore Database" in the Build section
 
-## Demo Configuration (For Testing)
-
-If you want to test the app quickly, you can use this demo configuration (but it won't persist data):
-
-```javascript
-const firebaseConfig = {
-    apiKey: "demo-key",
-    authDomain: "demo.firebaseapp.com",
-    projectId: "demo-project",
-    storageBucket: "demo.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:demo"
-};
-```
-
-**Note**: The demo config won't actually work with Firebase - you need to create your own project for real functionality.
+## Alternative: Use Local Version
+If you want to test immediately:
+1. Go to: http://localhost:3000/index-local.html
+2. Click "Start Using App"
+3. Test functionality without Firebase

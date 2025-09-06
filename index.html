@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Homework Tracker</title>
-    <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=13">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <!-- Firebase SDK -->
@@ -65,11 +65,11 @@
                     Homework Tracker
                 </h1>
                 <div class="auth-section">
-                    <button id="signin-btn" class="signin-btn">
+                    <button id="signin-btn" class="btn btn-primary">
                         <i class="fab fa-google"></i>
                         Sign in with Google
                     </button>
-                    <button id="signout-btn" class="signout-btn" style="display: none;">
+                    <button id="signout-btn" class="btn btn-danger" style="display: none;">
                         <i class="fas fa-sign-out-alt"></i>
                         Sign Out
                     </button>
@@ -87,7 +87,7 @@
                     <div class="login-illustration">
                         <i class="fas fa-graduation-cap"></i>
                     </div>
-                    <button id="login-card-signin" class="primary-btn">
+                    <button id="login-card-signin" class="btn btn-primary">
                         <i class="fab fa-google"></i>
                         Sign in with Google
                     </button>
@@ -100,7 +100,7 @@
                 <aside class="sidebar">
                     <div class="sidebar-header">
                         <h3>Classes</h3>
-                        <button id="add-class-btn" class="add-btn">
+                        <button id="add-class-btn" class="btn btn-secondary btn-icon">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -121,7 +121,7 @@
                             <span id="homework-count">0 assignments</span>
                         </div>
                         <div class="toolbar-right">
-                            <button id="add-homework-btn" class="primary-btn">
+                            <button id="add-homework-btn" class="btn btn-primary">
                                 <i class="fas fa-plus"></i>
                                 Add Homework
                             </button>
@@ -180,8 +180,8 @@
                     </select>
                 </div>
                 <div class="modal-actions">
-                    <button type="button" class="secondary-btn" id="cancel-homework">Cancel</button>
-                    <button type="submit" class="primary-btn">Add Homework</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-homework">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Homework</button>
                 </div>
             </form>
         </div>
@@ -201,18 +201,116 @@
                     <label for="class-name">Class Name</label>
                     <input type="text" id="class-name" required>
                 </div>
-                <div class="form-group">
-                    <label for="class-color">Color</label>
+                            <div class="form-group">
+                <label for="class-color">Color</label>
+                <div class="color-picker-container">
+                    <div class="preset-colors">
+                        <div class="preset-color" style="background-color: #3b82f6;" data-color="#3b82f6"></div>
+                        <div class="preset-color" style="background-color: #ef4444;" data-color="#ef4444"></div>
+                        <div class="preset-color" style="background-color: #10b981;" data-color="#10b981"></div>
+                        <div class="preset-color" style="background-color: #f59e0b;" data-color="#f59e0b"></div>
+                        <div class="preset-color" style="background-color: #8b5cf6;" data-color="#8b5cf6"></div>
+                        <div class="preset-color" style="background-color: #ec4899;" data-color="#ec4899"></div>
+                        <div class="preset-color" style="background-color: #06b6d4;" data-color="#06b6d4"></div>
+                        <div class="preset-color" style="background-color: #84cc16;" data-color="#84cc16"></div>
+                    </div>
+                    <div class="color-picker-label">Custom:</div>
                     <input type="color" id="class-color" value="#3b82f6">
                 </div>
+            </div>
                 <div class="modal-actions">
-                    <button type="button" class="secondary-btn" id="cancel-class">Cancel</button>
-                    <button type="submit" class="primary-btn">Add Class</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-class">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Class</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Edit Homework Modal -->
+    <div id="edit-homework-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Homework</h3>
+                <button class="close-btn" id="close-edit-homework-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="edit-homework-form">
+                <div class="form-group">
+                    <label for="edit-homework-title">Title</label>
+                    <input type="text" id="edit-homework-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-homework-description">Description</label>
+                    <textarea id="edit-homework-description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-homework-class">Class</label>
+                        <select id="edit-homework-class" required>
+                            <option value="">Select a class</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-homework-due-date">Due Date</label>
+                        <input type="datetime-local" id="edit-homework-due-date" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="edit-homework-priority">Priority</label>
+                    <select id="edit-homework-priority">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-edit-homework">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Homework</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Class Modal -->
+    <div id="edit-class-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Class</h3>
+                <button class="close-btn" id="close-edit-class-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="edit-class-form">
+                <div class="form-group">
+                    <label for="edit-class-name">Class Name</label>
+                    <input type="text" id="edit-class-name" required>
+                </div>
+                            <div class="form-group">
+                <label for="edit-class-color">Color</label>
+                <div class="color-picker-container">
+                    <div class="preset-colors">
+                        <div class="preset-color" style="background-color: #3b82f6;" data-color="#3b82f6"></div>
+                        <div class="preset-color" style="background-color: #ef4444;" data-color="#ef4444"></div>
+                        <div class="preset-color" style="background-color: #10b981;" data-color="#10b981"></div>
+                        <div class="preset-color" style="background-color: #f59e0b;" data-color="#f59e0b"></div>
+                        <div class="preset-color" style="background-color: #8b5cf6;" data-color="#8b5cf6"></div>
+                        <div class="preset-color" style="background-color: #ec4899;" data-color="#ec4899"></div>
+                        <div class="preset-color" style="background-color: #06b6d4;" data-color="#06b6d4"></div>
+                        <div class="preset-color" style="background-color: #84cc16;" data-color="#84cc16"></div>
+                    </div>
+                    <div class="color-picker-label">Custom:</div>
+                    <input type="color" id="edit-class-color" value="#3b82f6">
+                </div>
+            </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-edit-class">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Class</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js?v=9"></script>
 </body>
 </html>

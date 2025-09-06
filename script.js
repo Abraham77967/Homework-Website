@@ -83,9 +83,29 @@ function setupEventListeners() {
         hideModal('class-modal');
     });
     
+    // Edit homework modal close buttons
+    document.getElementById('close-edit-homework-modal').addEventListener('click', () => {
+        hideModal('edit-homework-modal');
+    });
+    
+    document.getElementById('cancel-edit-homework').addEventListener('click', () => {
+        hideModal('edit-homework-modal');
+    });
+    
+    // Edit class modal close buttons
+    document.getElementById('close-edit-class-modal').addEventListener('click', () => {
+        hideModal('edit-class-modal');
+    });
+    
+    document.getElementById('cancel-edit-class').addEventListener('click', () => {
+        hideModal('edit-class-modal');
+    });
+    
     // Form submissions
     document.getElementById('homework-form').addEventListener('submit', handleAddHomework);
     document.getElementById('class-form').addEventListener('submit', handleAddClass);
+    document.getElementById('edit-homework-form').addEventListener('submit', handleEditHomework);
+    document.getElementById('edit-class-form').addEventListener('submit', handleEditClass);
     
     // Modal backdrop clicks
     document.querySelectorAll('.modal').forEach(modal => {
@@ -161,6 +181,8 @@ function hideModal(modalId) {
         document.getElementById('homework-form').reset();
     } else if (modalId === 'class-modal') {
         document.getElementById('class-form').reset();
+    } else if (modalId === 'edit-homework-modal') {
+        document.getElementById('edit-homework-form').reset();
     }
 }
 
@@ -251,6 +273,51 @@ async function handleAddClass(e) {
     }
 }
 
+// Handle edit class
+async function handleEditClass(e) {
+    e.preventDefault();
+    
+    if (!currentUser) {
+        showNotification('Please sign in to edit classes.', 'error');
+        return;
+    }
+    
+    const classId = document.getElementById('edit-class-form').getAttribute('data-class-id');
+    const cls = classes.find(c => c.id === classId);
+    
+    if (!cls) {
+        showNotification('Class not found.', 'error');
+        return;
+    }
+    
+    try {
+        const { db, doc, updateDoc } = window.firebase;
+        
+        const updatedClass = {
+            name: document.getElementById('edit-class-name').value,
+            color: document.getElementById('edit-class-color').value,
+            updatedAt: new Date().toISOString()
+        };
+        
+        // Update in Firestore
+        await updateDoc(doc(db, 'classes', classId), updatedClass);
+        
+        // Update local array
+        Object.assign(cls, updatedClass);
+        
+        // Update UI
+        renderClasses();
+        updateClassSelect();
+        renderHomework(); // Re-render homework to update class names
+        hideModal('edit-class-modal');
+        
+        showNotification('Class updated successfully!', 'success');
+    } catch (error) {
+        console.error('Error updating class:', error);
+        showNotification(`Failed to update class: ${error.message}`, 'error');
+    }
+}
+
 // Render classes in sidebar
 function renderClasses() {
     const classList = document.getElementById('class-list');
@@ -260,18 +327,29 @@ function renderClasses() {
     classList.innerHTML = '';
     classList.appendChild(allClassesItem);
     
+    // Add click event listener to "All Homework" button
+    allClassesItem.addEventListener('click', () => {
+        selectClass('all');
+    });
+    
     classes.forEach(cls => {
         const classItem = document.createElement('div');
         classItem.className = 'class-item';
         classItem.setAttribute('data-class', cls.id);
         classItem.innerHTML = `
-            <i class="fas fa-book" style="color: ${cls.color}"></i>
-            <span>${cls.name}</span>
+            <div class="class-info" onclick="selectClass('${cls.id}')">
+                <i class="fas fa-book" style="color: ${cls.color}"></i>
+                <span>${cls.name}</span>
+            </div>
+            <div class="class-actions">
+                <button class="action-btn edit" onclick="editClass('${cls.id}')" title="Edit Class">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="action-btn delete" onclick="deleteClass('${cls.id}')" title="Delete Class">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
         `;
-        
-        classItem.addEventListener('click', () => {
-            selectClass(cls.id);
-        });
         
         classList.appendChild(classItem);
     });
@@ -307,36 +385,52 @@ function renderHomework() {
         const isOverdue = dueDate < new Date() && !hw.completed;
         const isDueSoon = dueDate - new Date() < 24 * 60 * 60 * 1000 && !hw.completed; // Due within 24 hours
         
+        // Status classes for the card
+        const statusClasses = [];
+        if (hw.completed) statusClasses.push('completed');
+        if (isOverdue) statusClasses.push('overdue');
+        if (isDueSoon && !isOverdue) statusClasses.push('due-soon');
+        
         return `
-            <div class="homework-item ${isOverdue ? 'overdue' : ''} ${isDueSoon ? 'due-soon' : ''}" data-id="${hw.id}">
+            <div class="homework-item ${statusClasses.join(' ')}" data-id="${hw.id}">
                 <div class="homework-header">
                     <div class="homework-title">
                         <input type="checkbox" ${hw.completed ? 'checked' : ''} onchange="toggleHomework('${hw.id}')">
-                        <span class="${hw.completed ? 'completed' : ''}">${hw.title}</span>
+                        <span>${hw.title}</span>
                     </div>
                     <div class="homework-actions">
-                        <button class="action-btn edit" onclick="editHomework('${hw.id}')">
+                        <button class="action-btn edit" onclick="editHomework('${hw.id}')" title="Edit">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button class="action-btn delete" onclick="deleteHomework('${hw.id}')">
+                        <button class="action-btn delete" onclick="deleteHomework('${hw.id}')" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 </div>
                 <div class="homework-meta">
                     <div class="meta-item">
-                        <i class="fas fa-book" style="color: ${classInfo ? classInfo.color : '#667eea'}"></i>
-                        <span>${classInfo ? classInfo.name : 'Unknown Class'}</span>
+                        <i class="fas fa-book"></i>
+                        <span class="meta-label">Class:</span>
+                        <span class="meta-value">${classInfo ? classInfo.name : 'Unknown Class'}</span>
                     </div>
                     <div class="meta-item">
                         <i class="fas fa-calendar"></i>
-                        <span>${formatDate(dueDate)}</span>
+                        <span class="meta-label">Due:</span>
+                        <span class="meta-value">${formatDate(dueDate)}</span>
                     </div>
                     <div class="meta-item">
+                        <i class="fas fa-flag"></i>
+                        <span class="meta-label">Priority:</span>
                         <span class="priority-badge priority-${hw.priority}">${hw.priority.charAt(0).toUpperCase() + hw.priority.slice(1)}</span>
                     </div>
-                    ${isOverdue ? '<div class="meta-item overdue-badge"><i class="fas fa-exclamation-triangle"></i> Overdue</div>' : ''}
-                    ${isDueSoon && !isOverdue ? '<div class="meta-item due-soon-badge"><i class="fas fa-clock"></i> Due Soon</div>' : ''}
+                    <div class="meta-item">
+                        <i class="fas fa-info-circle"></i>
+                        <span class="meta-label">Status:</span>
+                        ${hw.completed ? '<span class="status-badge completed-badge">Completed</span>' : 
+                          isOverdue ? '<span class="status-badge overdue-badge">Overdue</span>' : 
+                          isDueSoon ? '<span class="status-badge due-soon-badge">Due Soon</span>' : 
+                          '<span class="status-badge">On Track</span>'}
+                    </div>
                 </div>
                 ${hw.description ? `<div class="homework-description">${hw.description}</div>` : ''}
             </div>
@@ -417,10 +511,89 @@ async function deleteHomework(homeworkId) {
     }
 }
 
-// Edit homework (placeholder for future implementation)
+// Global variable to track homework being edited
+let editingHomeworkId = null;
+
+// Edit homework
 function editHomework(homeworkId) {
-    // TODO: Implement edit functionality
-    showNotification('Edit functionality coming soon!', 'info');
+    if (!currentUser) return;
+    
+    const hw = homework.find(h => h.id === homeworkId);
+    if (!hw) {
+        showNotification('Homework not found!', 'error');
+        return;
+    }
+    
+    // Store the ID of homework being edited
+    editingHomeworkId = homeworkId;
+    
+    // Populate the edit form with current values
+    document.getElementById('edit-homework-title').value = hw.title;
+    document.getElementById('edit-homework-description').value = hw.description || '';
+    document.getElementById('edit-homework-class').value = hw.classId;
+    document.getElementById('edit-homework-due-date').value = hw.dueDate;
+    document.getElementById('edit-homework-priority').value = hw.priority;
+    
+    // Update the class select for edit modal
+    updateEditClassSelect();
+    
+    // Show the edit modal
+    showModal('edit-homework-modal');
+}
+
+// Handle edit homework form submission
+async function handleEditHomework(e) {
+    e.preventDefault();
+    
+    if (!currentUser || !editingHomeworkId) {
+        showNotification('Error: No homework selected for editing.', 'error');
+        return;
+    }
+    
+    try {
+        const { db, doc, updateDoc } = window.firebase;
+        
+        const updatedHomework = {
+            title: document.getElementById('edit-homework-title').value,
+            description: document.getElementById('edit-homework-description').value,
+            classId: document.getElementById('edit-homework-class').value,
+            dueDate: document.getElementById('edit-homework-due-date').value,
+            priority: document.getElementById('edit-homework-priority').value,
+            updatedAt: new Date().toISOString()
+        };
+        
+        // Update in Firestore
+        const homeworkRef = doc(db, 'homework', editingHomeworkId);
+        await updateDoc(homeworkRef, updatedHomework);
+        
+        // Update in local array
+        const hwIndex = homework.findIndex(h => h.id === editingHomeworkId);
+        if (hwIndex !== -1) {
+            homework[hwIndex] = { ...homework[hwIndex], ...updatedHomework };
+        }
+        
+        renderHomework();
+        hideModal('edit-homework-modal');
+        editingHomeworkId = null;
+        
+        showNotification('Homework updated successfully!', 'success');
+    } catch (error) {
+        console.error('Error updating homework:', error);
+        showNotification('Failed to update homework. Please try again.', 'error');
+    }
+}
+
+// Update class select dropdown for edit modal
+function updateEditClassSelect() {
+    const classSelect = document.getElementById('edit-homework-class');
+    classSelect.innerHTML = '<option value="">Select a class</option>';
+    
+    classes.forEach(cls => {
+        const option = document.createElement('option');
+        option.value = cls.id;
+        option.textContent = cls.name;
+        classSelect.appendChild(option);
+    });
 }
 
 // Update class select dropdown
@@ -555,34 +728,127 @@ style.textContent = `
         }
     }
     
-    .homework-item.overdue {
-        border-left-color: #ef4444;
-        background: #fef2f2;
-    }
-    
-    .homework-item.due-soon {
-        border-left-color: #f59e0b;
-        background: #fffbeb;
-    }
-    
-    .homework-title .completed {
-        text-decoration: line-through;
-        color: #9ca3af;
-    }
-    
-    .overdue-badge {
-        color: #dc2626;
-        font-weight: 500;
-    }
-    
-    .due-soon-badge {
-        color: #d97706;
-        font-weight: 500;
-    }
-    
-    .homework-title input[type="checkbox"] {
-        margin-right: 0.5rem;
-        transform: scale(1.2);
-    }
+
 `;
 document.head.appendChild(style);
+
+// Edit class function
+function editClass(classId) {
+    const cls = classes.find(c => c.id === classId);
+    if (!cls) {
+        showNotification('Class not found.', 'error');
+        return;
+    }
+    
+    // Populate the edit form
+    document.getElementById('edit-class-name').value = cls.name;
+    document.getElementById('edit-class-color').value = cls.color;
+    
+    // Store the class ID for the form submission
+    document.getElementById('edit-class-form').setAttribute('data-class-id', classId);
+    
+    // Show the modal
+    showModal('edit-class-modal');
+}
+
+// Delete class function
+async function deleteClass(classId) {
+    const cls = classes.find(c => c.id === classId);
+    if (!cls) {
+        showNotification('Class not found.', 'error');
+        return;
+    }
+    
+    // Check if class has homework
+    const classHomework = homework.filter(hw => hw.classId === classId);
+    if (classHomework.length > 0) {
+        const confirmed = confirm(`This class has ${classHomework.length} homework assignment(s). Deleting the class will also delete all associated homework. Are you sure you want to continue?`);
+        if (!confirmed) {
+            return;
+        }
+    } else {
+        const confirmed = confirm(`Are you sure you want to delete "${cls.name}"?`);
+        if (!confirmed) {
+            return;
+        }
+    }
+    
+    try {
+        const { db, doc, deleteDoc } = window.firebase;
+        
+        // Delete the class from Firestore
+        await deleteDoc(doc(db, 'classes', classId));
+        
+        // Delete associated homework from Firestore
+        const homeworkToDelete = homework.filter(hw => hw.classId === classId);
+        for (const hw of homeworkToDelete) {
+            await deleteDoc(doc(db, 'homework', hw.id));
+        }
+        
+        // Remove from local arrays
+        classes = classes.filter(c => c.id !== classId);
+        homework = homework.filter(hw => hw.classId !== classId);
+        
+        // Update UI
+        renderClasses();
+        renderHomework();
+        updateClassSelect();
+        
+        // If the deleted class was selected, switch to "all"
+        if (currentClassFilter === classId) {
+            selectClass('all');
+        }
+        
+        showNotification('Class and associated homework deleted successfully!', 'success');
+    } catch (error) {
+        console.error('Error deleting class:', error);
+        showNotification(`Failed to delete class: ${error.message}`, 'error');
+    }
+}
+
+// Initialize color pickers with preset colors
+function initializeColorPickers() {
+    const colorPickers = document.querySelectorAll('input[type="color"]');
+    const presetColorContainers = document.querySelectorAll('.preset-colors');
+    
+    colorPickers.forEach((colorPicker, index) => {
+        const presetColors = presetColorContainers[index]?.querySelectorAll('.preset-color');
+        
+        if (presetColors) {
+            // Handle preset color selection
+            presetColors.forEach(color => {
+                color.addEventListener('click', function() {
+                    const selectedColor = this.getAttribute('data-color');
+                    colorPicker.value = selectedColor;
+                    
+                    // Update visual selection
+                    presetColors.forEach(c => c.classList.remove('selected'));
+                    this.classList.add('selected');
+                });
+            });
+            
+            // Handle custom color picker change
+            colorPicker.addEventListener('change', function() {
+                // Remove selection from preset colors when custom color is chosen
+                presetColors.forEach(c => c.classList.remove('selected'));
+            });
+            
+            // Set initial selection
+            const initialColor = colorPicker.value;
+            const initialPreset = presetColorContainers[index].querySelector(`[data-color="${initialColor}"]`);
+            if (initialPreset) {
+                initialPreset.classList.add('selected');
+            }
+        }
+    });
+}
+
+// Initialize color pickers when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeColorPickers();
+});
+
+// Re-initialize color pickers when modals are shown
+document.addEventListener('modalShown', function() {
+    initializeColorPickers();
+});
