@@ -1,10 +1,4 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp as firebaseInitializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
-
-// Your web app's Firebase configuration
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCA3ECMlIUGr9lh56y4lfcv2Laehxxln2A",
   authDomain: "homework-website-236e8.firebaseapp.com",
@@ -16,15 +10,17 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = firebaseInitializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-const auth = getAuth(app);
-const db = getFirestore(app);
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const analytics = firebase.analytics();
 
 // Global variables
 let currentUser = null;
 let homeworkList = [];
+let selectedClass = 'all';
 let unsubscribe = null;
+let currentTheme = 'light';
 
 // DOM elements
 const authSection = document.getElementById('auth-section');
@@ -38,10 +34,11 @@ const homeworkForm = document.getElementById('homework-form');
 const homeworkListElement = document.getElementById('homework-list');
 const emptyState = document.getElementById('empty-state');
 const loadingSpinner = document.getElementById('loading-spinner');
-const filterSubject = document.getElementById('filter-subject');
 const filterPriority = document.getElementById('filter-priority');
 const filterStatus = document.getElementById('filter-status');
 const sortBy = document.getElementById('sort-by');
+const themeToggle = document.getElementById('theme-toggle');
+const themeIcon = document.getElementById('theme-icon');
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -49,17 +46,20 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
+    // Initialize theme
+    initializeTheme();
+    
     // Set up event listeners
     setupEventListeners();
     
     // Listen for authentication state changes
-    onAuthStateChanged(auth, handleAuthStateChange);
+    auth.onAuthStateChanged(handleAuthStateChange);
 }
 
 function setupEventListeners() {
     // Authentication
     googleSigninBtn.addEventListener('click', signInWithGoogle);
-    signoutBtn.addEventListener('click', signOut);
+    signoutBtn.addEventListener('click', handleSignOut);
     
     // Form submission
     homeworkForm.addEventListener('submit', handleAddHomework);
@@ -73,13 +73,13 @@ function setupEventListeners() {
 
 // Authentication functions
 function signInWithGoogle() {
-    const provider = new GoogleAuthProvider();
+    const provider = new firebase.auth.GoogleAuthProvider();
     provider.addScope('email');
     provider.addScope('profile');
     
     showLoading(true);
     
-    signInWithPopup(auth, provider)
+    auth.signInWithPopup(provider)
         .then((result) => {
             console.log('Sign in successful:', result.user);
             hideAuthError();
@@ -93,8 +93,8 @@ function signInWithGoogle() {
         });
 }
 
-function signOut() {
-    signOut(auth)
+function handleSignOut() {
+    auth.signOut()
         .then(() => {
             console.log('Sign out successful');
         })
@@ -161,8 +161,8 @@ function handleAddHomework(e) {
         priority: formData.get('priority'),
         description: formData.get('description').trim(),
         status: 'pending',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         userId: currentUser.uid
     };
     
@@ -174,7 +174,7 @@ function handleAddHomework(e) {
     
     showLoading(true);
     
-    addDoc(collection(db, 'homework'), homework)
+    db.collection('homework').add(homework)
         .then((docRef) => {
             console.log('Homework added with ID:', docRef.id);
             homeworkForm.reset();
@@ -192,21 +192,23 @@ function handleAddHomework(e) {
 function setupRealtimeListener() {
     if (!currentUser) return;
     
-    const q = query(
-        collection(db, 'homework'),
-        where('userId', '==', currentUser.uid),
-        orderBy('createdAt', 'desc')
-    );
+    console.log('Setting up realtime listener for user:', currentUser.uid);
     
-    unsubscribe = onSnapshot(q, (snapshot) => {
+    unsubscribe = db.collection('homework')
+        .where('userId', '==', currentUser.uid)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+        console.log('Snapshot received:', snapshot.size, 'documents');
         homeworkList = [];
         snapshot.forEach((doc) => {
+            console.log('Document:', doc.id, doc.data());
             homeworkList.push({
                 id: doc.id,
                 ...doc.data()
             });
         });
         
+        console.log('Homework list updated:', homeworkList);
         renderHomeworkList();
     }, (error) => {
         console.error('Error listening to homework updates:', error);
@@ -225,15 +227,27 @@ function cleanupRealtimeListener() {
 function renderHomeworkList() {
     const filteredHomework = getFilteredHomework();
     
-    if (filteredHomework.length === 0) {
+    console.log('Rendering homework list. Total:', homeworkList.length, 'Filtered:', filteredHomework.length);
+    
+    // Render class navigation
+    renderClassNavigation();
+    
+    // Filter by selected class
+    const classFilteredHomework = selectedClass === 'all' 
+        ? filteredHomework 
+        : filteredHomework.filter(homework => homework.subject === selectedClass);
+    
+    if (classFilteredHomework.length === 0) {
         homeworkListElement.innerHTML = '';
         emptyState.style.display = 'block';
+        console.log('Showing empty state');
         return;
     }
     
     emptyState.style.display = 'none';
+    console.log('Rendering', classFilteredHomework.length, 'homework items');
     
-    homeworkListElement.innerHTML = filteredHomework.map(homework => 
+    homeworkListElement.innerHTML = classFilteredHomework.map(homework => 
         createHomeworkItemHTML(homework)
     ).join('');
     
@@ -241,51 +255,85 @@ function renderHomeworkList() {
     addActionButtonListeners();
 }
 
+function renderClassNavigation() {
+    const classNavElement = document.getElementById('classNav');
+    
+    // Get unique classes from homework
+    const classes = [...new Set(homeworkList.map(homework => homework.subject || 'Other'))];
+    
+    // Create navigation buttons
+    const navButtons = [
+        {
+            id: 'all',
+            name: 'All Classes',
+            count: homeworkList.length
+        },
+        ...classes.map(subject => ({
+            id: subject,
+            name: subject,
+            count: homeworkList.filter(homework => homework.subject === subject).length
+        }))
+    ];
+    
+    classNavElement.innerHTML = navButtons.map(btn => `
+        <button class="class-nav-btn ${btn.id === selectedClass ? 'active' : ''}" 
+                data-class="${btn.id}">
+            ${btn.name}
+            <span class="count">${btn.count}</span>
+        </button>
+    `).join('');
+    
+    // Add event listeners to class navigation buttons
+    classNavElement.addEventListener('click', (e) => {
+        if (e.target.classList.contains('class-nav-btn')) {
+            selectedClass = e.target.dataset.class;
+            renderHomeworkList();
+        }
+    });
+}
+
 function createHomeworkItemHTML(homework) {
     const dueDate = homework.dueDate ? new Date(homework.dueDate).toLocaleDateString() : 'No date';
-    const createdAt = homework.createdAt ? homework.createdAt.toDate().toLocaleDateString() : 'Unknown';
     const isOverdue = homework.dueDate && new Date(homework.dueDate) < new Date() && homework.status !== 'completed';
     
+    // Calculate days until due
+    let daysUntilDue = '';
+    if (homework.dueDate) {
+        const today = new Date();
+        const due = new Date(homework.dueDate);
+        const diffTime = due - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) {
+            daysUntilDue = `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} overdue`;
+        } else if (diffDays === 0) {
+            daysUntilDue = 'Due today';
+        } else if (diffDays === 1) {
+            daysUntilDue = 'Due tomorrow';
+        } else {
+            daysUntilDue = `Due in ${diffDays} days`;
+        }
+    }
+    
     return `
-        <div class="homework-item ${homework.status} ${homework.priority}-priority ${isOverdue ? 'overdue' : ''}" data-id="${homework.id}">
-            <div class="homework-header">
-                <div>
-                    <h3 class="homework-title">${escapeHtml(homework.title)}</h3>
-                    <span class="homework-subject">${escapeHtml(homework.subject)}</span>
-                </div>
-                <div class="homework-actions">
-                    <button class="action-btn edit" data-id="${homework.id}" title="Edit">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="action-btn delete" data-id="${homework.id}" title="Delete">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
+        <div class="homework-item glow-hover ${homework.status} ${homework.priority}-priority ${isOverdue ? 'overdue' : ''}" data-id="${homework.id}">
+            <div class="homework-main">
+                <h3 class="homework-title">${escapeHtml(homework.title)}</h3>
+                <span class="homework-subject">${escapeHtml(homework.subject)}</span>
             </div>
-            <div class="homework-details">
-                <div class="detail-item">
-                    <i class="fas fa-calendar-alt"></i>
-                    <span>Due: ${dueDate}</span>
-                </div>
-                <div class="detail-item">
-                    <i class="fas fa-flag"></i>
-                    <span class="priority-badge ${homework.priority}">${homework.priority}</span>
-                </div>
-                <div class="detail-item">
-                    <i class="fas fa-info-circle"></i>
-                    <span class="status-badge ${homework.status}">${homework.status.replace('-', ' ')}</span>
-                </div>
-                <div class="detail-item">
-                    <i class="fas fa-clock"></i>
-                    <span>Created: ${createdAt}</span>
-                </div>
+            <div class="due-date-main">
+                <div class="due-date ${isOverdue ? 'overdue' : ''}">${dueDate}</div>
+                <div class="days-until ${isOverdue ? 'overdue' : ''}">${daysUntilDue}</div>
             </div>
-            ${homework.description ? `<div class="homework-description">${escapeHtml(homework.description)}</div>` : ''}
-            <div class="homework-actions-bottom">
-                <button class="status-btn ${homework.status === 'pending' ? 'start' : homework.status === 'in-progress' ? 'complete' : 'reopen'}" 
-                        data-id="${homework.id}" 
-                        data-current-status="${homework.status}">
-                    ${homework.status === 'pending' ? 'Start' : homework.status === 'in-progress' ? 'Complete' : 'Reopen'}
+            <div class="homework-status">
+                <span class="status-badge ${homework.status}">${homework.status.replace('-', ' ')}</span>
+            </div>
+            <div class="homework-actions">
+                <button class="action-btn edit glow-hover" data-id="${homework.id}" title="Edit">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="action-btn delete glow-hover" data-id="${homework.id}" title="Delete">
+                    <i class="fas fa-trash"></i>
                 </button>
             </div>
         </div>
@@ -353,12 +401,12 @@ function handleUpdateHomework(e, id) {
         dueDate: formData.get('dueDate'),
         priority: formData.get('priority'),
         description: formData.get('description').trim(),
-        updatedAt: serverTimestamp()
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
     showLoading(true);
     
-    updateDoc(doc(db, 'homework', id), updatedHomework)
+    db.collection('homework').doc(id).update(updatedHomework)
         .then(() => {
             console.log('Homework updated successfully');
             resetForm();
@@ -379,7 +427,7 @@ function deleteHomework(id) {
     
     showLoading(true);
     
-    deleteDoc(doc(db, 'homework', id))
+    db.collection('homework').doc(id).delete()
         .then(() => {
             console.log('Homework deleted successfully');
         })
@@ -410,9 +458,9 @@ function updateHomeworkStatus(id, currentStatus) {
     
     showLoading(true);
     
-    updateDoc(doc(db, 'homework', id), {
+    db.collection('homework').doc(id).update({
         status: newStatus,
-        updatedAt: serverTimestamp()
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     })
         .then(() => {
             console.log('Homework status updated successfully');
@@ -502,6 +550,96 @@ window.addEventListener('online', () => {
 window.addEventListener('offline', () => {
     console.log('App is offline');
 });
+
+// Theme Management Functions
+function initializeTheme() {
+    // Check for saved theme preference or default to light
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme) {
+        currentTheme = savedTheme;
+    } else {
+        // Auto-detect theme based on time of day
+        currentTheme = getTimeBasedTheme();
+    }
+    
+    applyTheme(currentTheme);
+    updateThemeIcon();
+    
+    // Set up theme toggle event listener
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+    }
+    
+    // Listen for system theme changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (!localStorage.getItem('theme')) {
+            currentTheme = e.matches ? 'dark' : 'light';
+            applyTheme(currentTheme);
+            updateThemeIcon();
+        }
+    });
+    
+    // Auto-switch theme based on time every hour
+    setInterval(() => {
+        if (!localStorage.getItem('theme')) {
+            const timeBasedTheme = getTimeBasedTheme();
+            if (timeBasedTheme !== currentTheme) {
+                currentTheme = timeBasedTheme;
+                applyTheme(currentTheme);
+                updateThemeIcon();
+            }
+        }
+    }, 60 * 60 * 1000); // Check every hour
+}
+
+function getTimeBasedTheme() {
+    const hour = new Date().getHours();
+    // Dark mode from 7 PM to 7 AM
+    return (hour >= 19 || hour < 7) ? 'dark' : 'light';
+}
+
+function toggleTheme() {
+    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+    applyTheme(currentTheme);
+    updateThemeIcon();
+    
+    // Save user preference
+    localStorage.setItem('theme', currentTheme);
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    currentTheme = theme;
+}
+
+function updateThemeIcon() {
+    if (!themeIcon) return;
+    
+    // Clear existing content
+    themeIcon.innerHTML = '';
+    
+    if (currentTheme === 'light') {
+        // Sun icon for light mode
+        themeIcon.innerHTML = `
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        `;
+    } else {
+        // Moon icon for dark mode
+        themeIcon.innerHTML = `
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        `;
+    }
+}
 
 // Service Worker registration for PWA capabilities
 if ('serviceWorker' in navigator) {

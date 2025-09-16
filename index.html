@@ -9,6 +9,21 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    <!-- Theme Toggle Button -->
+    <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
+        <svg id="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+    </button>
+
     <!-- Authentication Section -->
     <div id="auth-section" class="auth-section">
         <div class="auth-container">
@@ -33,7 +48,7 @@
                 <div class="user-info">
                     <img id="user-avatar" class="user-avatar" src="" alt="User Avatar">
                     <span id="user-name" class="user-name"></span>
-                    <button id="signout-btn" class="signout-btn">
+                    <button id="signout-btn" class="logout-btn">
                         <i class="fas fa-sign-out-alt"></i>
                     </button>
                 </div>
@@ -43,12 +58,12 @@
         <!-- Main Content -->
         <main class="main-content">
             <!-- Add Homework Form -->
-            <div class="add-homework-section">
-                <h2>Add New Homework</h2>
+            <div class="form-section">
+                <h2 class="section-title">Add New Homework</h2>
                 <form id="homework-form" class="homework-form">
                     <div class="form-group">
                         <label for="title">Title</label>
-                        <input type="text" id="title" name="title" required>
+                        <input type="text" id="title" name="title" placeholder="Enter homework title..." required>
                     </div>
                     <div class="form-group">
                         <label for="subject">Subject</label>
@@ -78,7 +93,7 @@
                     </div>
                     <div class="form-group">
                         <label for="description">Description</label>
-                        <textarea id="description" name="description" rows="3"></textarea>
+                        <textarea id="description" name="description" rows="3" placeholder="Add any additional details..."></textarea>
                     </div>
                     <button type="submit" class="submit-btn">
                         <i class="fas fa-plus"></i>
@@ -87,46 +102,46 @@
                 </form>
             </div>
 
-            <!-- Filter and Sort Controls -->
+            <!-- Controls Section -->
             <div class="controls-section">
-                <div class="filter-controls">
-                    <select id="filter-subject" class="filter-select">
-                        <option value="">All Subjects</option>
-                        <option value="Math">Math</option>
-                        <option value="Science">Science</option>
-                        <option value="English">English</option>
-                        <option value="History">History</option>
-                        <option value="Art">Art</option>
-                        <option value="Music">Music</option>
-                        <option value="Physical Education">Physical Education</option>
-                        <option value="Other">Other</option>
-                    </select>
-                    <select id="filter-priority" class="filter-select">
-                        <option value="">All Priorities</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                    </select>
-                    <select id="filter-status" class="filter-select">
-                        <option value="">All Status</option>
-                        <option value="pending">Pending</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                    </select>
-                </div>
-                <div class="sort-controls">
-                    <select id="sort-by" class="sort-select">
-                        <option value="dueDate">Sort by Due Date</option>
-                        <option value="priority">Sort by Priority</option>
-                        <option value="createdAt">Sort by Created Date</option>
-                        <option value="title">Sort by Title</option>
-                    </select>
+                <div class="controls-content">
+                    <!-- Class Navigation -->
+                    <div class="class-nav" id="classNav">
+                        <!-- Class navigation buttons will be dynamically generated -->
+                    </div>
+                    
+                    <!-- Filter and Sort Controls -->
+                    <div class="filter-controls">
+                        <select id="filter-priority" class="filter-select">
+                            <option value="">All Priorities</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                        <select id="filter-status" class="filter-select">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="sort-controls">
+                        <select id="sort-by" class="sort-select">
+                            <option value="dueDate">Sort by Due Date</option>
+                            <option value="priority">Sort by Priority</option>
+                            <option value="createdAt">Sort by Created Date</option>
+                            <option value="title">Sort by Title</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
             <!-- Homework List -->
             <div class="homework-list-section">
-                <h2>Your Homework</h2>
+                <div class="homework-header">
+                    <h2 class="section-title">Your Homework</h2>
+                    <div id="homework-count" class="homework-count"></div>
+                </div>
                 <div id="homework-list" class="homework-list">
                     <!-- Homework items will be dynamically added here -->
                 </div>
@@ -145,12 +160,12 @@
     </div>
 
     <!-- Firebase SDK -->
-    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
-    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js"></script>
-    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
-    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
     
     <!-- App JavaScript -->
-    <script type="module" src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
