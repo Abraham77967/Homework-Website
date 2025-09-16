@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homework Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Authentication Section -->
+    <div id="auth-section" class="auth-section">
+        <div class="auth-container">
+            <div class="auth-card">
+                <h1 class="auth-title">Homework Tracker</h1>
+                <p class="auth-subtitle">Keep track of your assignments across all devices</p>
+                <button id="google-signin-btn" class="google-signin-btn">
+                    <i class="fab fa-google"></i>
+                    Sign in with Google
+                </button>
+                <div id="auth-error" class="auth-error"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Section -->
+    <div id="app-section" class="app-section hidden">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="app-title">Homework Tracker</h1>
+                <div class="user-info">
+                    <img id="user-avatar" class="user-avatar" src="" alt="User Avatar">
+                    <span id="user-name" class="user-name"></span>
+                    <button id="signout-btn" class="signout-btn">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Add Homework Form -->
+            <div class="add-homework-section">
+                <h2>Add New Homework</h2>
+                <form id="homework-form" class="homework-form">
+                    <div class="form-group">
+                        <label for="title">Title</label>
+                        <input type="text" id="title" name="title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="subject">Subject</label>
+                        <select id="subject" name="subject" required>
+                            <option value="">Select Subject</option>
+                            <option value="Math">Math</option>
+                            <option value="Science">Science</option>
+                            <option value="English">English</option>
+                            <option value="History">History</option>
+                            <option value="Art">Art</option>
+                            <option value="Music">Music</option>
+                            <option value="Physical Education">Physical Education</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="due-date">Due Date</label>
+                        <input type="date" id="due-date" name="dueDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="priority">Priority</label>
+                        <select id="priority" name="priority" required>
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" name="description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-plus"></i>
+                        Add Homework
+                    </button>
+                </form>
+            </div>
+
+            <!-- Filter and Sort Controls -->
+            <div class="controls-section">
+                <div class="filter-controls">
+                    <select id="filter-subject" class="filter-select">
+                        <option value="">All Subjects</option>
+                        <option value="Math">Math</option>
+                        <option value="Science">Science</option>
+                        <option value="English">English</option>
+                        <option value="History">History</option>
+                        <option value="Art">Art</option>
+                        <option value="Music">Music</option>
+                        <option value="Physical Education">Physical Education</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <select id="filter-priority" class="filter-select">
+                        <option value="">All Priorities</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                    <select id="filter-status" class="filter-select">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </div>
+                <div class="sort-controls">
+                    <select id="sort-by" class="sort-select">
+                        <option value="dueDate">Sort by Due Date</option>
+                        <option value="priority">Sort by Priority</option>
+                        <option value="createdAt">Sort by Created Date</option>
+                        <option value="title">Sort by Title</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Homework List -->
+            <div class="homework-list-section">
+                <h2>Your Homework</h2>
+                <div id="homework-list" class="homework-list">
+                    <!-- Homework items will be dynamically added here -->
+                </div>
+                <div id="empty-state" class="empty-state">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h3>No homework yet</h3>
+                    <p>Add your first assignment to get started!</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="loading-spinner hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
+    <script type="module" src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics.js"></script>
+    
+    <!-- App JavaScript -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
