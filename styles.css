@@ -690,6 +690,42 @@ body {
     box-shadow: var(--shadow-sm);
 }
 
+/* Weekly Homework Button */
+.add-weekly-homework-btn {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: 12px 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    height: fit-content;
+}
+
+.add-weekly-homework-btn:hover {
+    background: var(--neon-purple-light);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.add-weekly-homework-btn:active {
+    transform: translateY(0);
+    transition: all 0.1s ease;
+}
+
+.add-weekly-homework-btn i {
+    font-size: 0.875rem;
+}
+
 /* Add Homework Button */
 .add-homework-btn {
     background: var(--bg-primary);
@@ -733,279 +769,45 @@ body {
     align-items: center;
 }
 
-/* Weekly Homework Button */
-.add-weekly-homework-btn {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: var(--text-inverse);
+/* Square Button Base Style */
+.btn-square {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
     border: none;
-    border-radius: var(--radius-lg);
-    padding: 12px 20px;
-    font-size: 0.875rem;
-    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
     box-shadow: var(--shadow-sm);
     display: flex;
     align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-    height: fit-content;
+    justify-content: center;
+    font-size: 1rem;
+    font-weight: 600;
+    position: relative;
 }
 
-.add-weekly-homework-btn:hover {
-    background: linear-gradient(135deg, #e085f0 0%, #f04a5c 100%);
-    box-shadow: var(--shadow-lg);
+.btn-square:hover {
     transform: translateY(-2px);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.add-weekly-homework-btn:active {
+.btn-square:active {
     transform: translateY(0);
     transition: all 0.1s ease;
 }
 
-.add-weekly-homework-btn i {
-    font-size: 0.875rem;
-}
-
-/* Weekly Homework Modal Styles */
-.weekly-modal-content {
-    max-width: 700px;
-    width: 95%;
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-
-/* Form Sections */
-.form-section {
-    margin-bottom: 24px;
-    padding: 20px;
-    background: var(--bg-secondary);
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-}
-
-.form-section h3 {
+.btn-square i {
     font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0 0 16px 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 
-.form-section h3::before {
-    content: '';
-    width: 4px;
-    height: 16px;
-    background: var(--accent-primary);
-    border-radius: 2px;
-}
 
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    margin-bottom: 16px;
-}
 
-.form-row:last-child {
-    margin-bottom: 0;
-}
-
-/* Day Selector */
-.day-selector {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 8px;
-    margin-top: 8px;
-}
-
-.day-btn {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 8px 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-align: center;
-}
-
-.day-btn:hover {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
-}
-
-.day-btn.active {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
-}
-
-/* End Date Container */
-.end-date-container {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.toggle-indefinite {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 8px 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-}
-
-.toggle-indefinite:hover {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
-}
-
-.toggle-indefinite.active {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
-}
-
-/* Priority Selector */
-.priority-selector {
-    display: flex;
-    gap: 12px;
-    margin-top: 8px;
-}
-
-.priority-btn {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 12px 16px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1;
-    justify-content: center;
-}
-
-.priority-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.priority-btn.active {
-    background: var(--accent-primary);
-    color: white;
-    border-color: var(--accent-primary);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-}
-
-.priority-btn[data-priority="low"].active {
-    background: #10b981;
-    border-color: #10b981;
-}
-
-.priority-btn[data-priority="high"].active {
-    background: #ef4444;
-    border-color: #ef4444;
-}
-
-/* Preview Section */
-.preview-section {
-    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-primary));
-    border: 1px solid var(--accent-primary);
-}
-
-.assignment-preview {
-    background: var(--bg-primary);
-    border-radius: 8px;
-    padding: 16px;
-    border: 1px solid var(--border-color);
-}
-
-.preview-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.preview-title {
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.preview-date {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-}
-
-.preview-count {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.875rem;
-}
-
-#preview-count {
-    font-weight: 600;
-    color: var(--accent-primary);
-}
-
-#preview-period {
-    color: var(--text-secondary);
-}
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .weekly-modal-content {
-        width: 98%;
-        max-height: 95vh;
-    }
-    
     .form-row {
         grid-template-columns: 1fr;
         gap: 12px;
-    }
-    
-    .template-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .day-selector {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    
-    .priority-selector {
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .end-date-container {
-        flex-direction: column;
-        align-items: stretch;
     }
 }
 
@@ -1099,20 +901,6 @@ body {
     border-color: var(--border-secondary);
 }
 
-/* Weekly Homework Indicator */
-.weekly-indicator {
-    color: #f5576c;
-    margin-right: 8px;
-    font-size: 0.875rem;
-}
-
-.weekly-homework {
-    border-left: 3px solid #f5576c;
-}
-
-.weekly-homework .homework-title {
-    color: var(--text-primary);
-}
 
 /* Modal Styles */
 .modal {
@@ -2014,6 +1802,25 @@ body {
     border: 1px solid var(--border-primary);
 }
 
+.weekly-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    color: var(--neon-purple);
+    font-size: 0.75rem;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+}
+
+.weekly-indicator:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.weekly-indicator i {
+    font-size: 0.7rem;
+}
+
 .due-date-main {
     display: flex;
     flex-direction: column;
@@ -2657,6 +2464,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
         font-size: 1.75rem;
     }
     
+    .add-weekly-homework-btn,
     .add-homework-btn {
         width: 100%;
         justify-content: center;
@@ -2827,32 +2635,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
    CLASS MANAGEMENT STYLES
    ======================================== */
 
-/* Class Management Button */
+/* Class Management Button - Square Design */
 .manage-classes-btn {
     background: linear-gradient(135deg, var(--neon-purple), var(--neon-blue));
     color: white;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.9rem;
-    box-shadow: var(--shadow-sm);
 }
 
 .manage-classes-btn:hover {
-    transform: translateY(-2px);
     box-shadow: 
         0 0 20px rgba(147, 51, 234, 0.4),
         0 8px 25px rgba(0, 0, 0, 0.15);
-}
-
-.manage-classes-btn:active {
-    transform: translateY(0);
 }
 
 /* Class Management Modal */

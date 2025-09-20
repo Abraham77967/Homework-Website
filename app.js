@@ -109,6 +109,9 @@ const weeklyHomeworkModal = document.getElementById('weekly-homework-modal');
 const weeklyHomeworkForm = document.getElementById('weekly-homework-form');
 const closeWeeklyModalBtn = document.getElementById('close-weekly-modal');
 const cancelWeeklyBtn = document.getElementById('cancel-weekly-btn');
+const weeklyDueTimeInput = document.getElementById('weekly-due-time');
+const weeklyTimeIndicator = document.getElementById('weeklyTimeIndicator');
+
 
 // Class management elements
 const manageClassesBtn = document.getElementById('manage-classes-btn');
@@ -123,9 +126,7 @@ const colorPreview = document.getElementById('color-preview');
 
 // Time input elements
 const dueTimeInput = document.getElementById('due-time');
-const weeklyTimeInput = document.getElementById('weekly-time');
 const timeIndicator = document.getElementById('timeIndicator');
-const weeklyTimeIndicator = document.getElementById('weeklyTimeIndicator');
 
 // Calendar elements
 const calendarBtn = document.getElementById('calendar-btn');
@@ -170,6 +171,7 @@ function setupEventListeners() {
     closeWeeklyModalBtn.addEventListener('click', closeWeeklyHomeworkModal);
     cancelWeeklyBtn.addEventListener('click', closeWeeklyHomeworkModal);
     
+    
     // Class management modal functionality
     manageClassesBtn.addEventListener('click', openClassManagementModal);
     closeClassModalBtn.addEventListener('click', closeClassManagementModal);
@@ -182,11 +184,13 @@ function setupEventListeners() {
         updateTimeIndicator(dueTimeInput, timeIndicator);
     }
     
-    if (weeklyTimeInput && weeklyTimeIndicator) {
-        weeklyTimeInput.addEventListener('input', () => updateTimeIndicator(weeklyTimeInput, weeklyTimeIndicator));
+    // Weekly homework time input indicators
+    if (weeklyDueTimeInput && weeklyTimeIndicator) {
+        weeklyDueTimeInput.addEventListener('input', () => updateTimeIndicator(weeklyDueTimeInput, weeklyTimeIndicator));
         // Initialize with current value or default
-        updateTimeIndicator(weeklyTimeInput, weeklyTimeIndicator);
+        updateTimeIndicator(weeklyDueTimeInput, weeklyTimeIndicator);
     }
+    
     
     // Close modal when clicking outside
     addHomeworkModal.addEventListener('click', (e) => {
@@ -195,15 +199,17 @@ function setupEventListeners() {
         }
     });
     
-    weeklyHomeworkModal.addEventListener('click', (e) => {
-        if (e.target === weeklyHomeworkModal) {
-            closeWeeklyHomeworkModal();
-        }
-    });
     
     classManagementModal.addEventListener('click', (e) => {
         if (e.target === classManagementModal) {
             closeClassManagementModal();
+        }
+    });
+    
+    // Close weekly homework modal when clicking outside
+    weeklyHomeworkModal.addEventListener('click', (e) => {
+        if (e.target === weeklyHomeworkModal) {
+            closeWeeklyHomeworkModal();
         }
     });
     
@@ -221,11 +227,6 @@ function setupEventListeners() {
     // Calendar functionality
     setupCalendarEventListeners();
     
-    // Weekly homework interactive elements
-    setupDaySelector();
-    setupPrioritySelector();
-    setupIndefiniteToggle();
-    setupPreviewUpdates();
 }
 
 // Authentication functions
@@ -334,7 +335,7 @@ function closeAddHomeworkModal() {
     }, 300);
 }
 
-// Weekly homework modal functions
+// Weekly Homework Modal Functions
 function openWeeklyHomeworkModal() {
     weeklyHomeworkModal.classList.remove('hidden');
     // Trigger animation by adding show class after a brief delay
@@ -359,6 +360,7 @@ function closeWeeklyHomeworkModal() {
         resetWeeklyForm();
     }, 300);
 }
+
 
 // Homework management functions
 function handleAddHomework(e) {
@@ -407,7 +409,7 @@ function handleAddHomework(e) {
         });
 }
 
-// Weekly homework management functions
+// NEW WEEKLY HOMEWORK SYSTEM - SIMPLE AND CLEAN
 function handleAddWeeklyHomework(e) {
     e.preventDefault();
     
@@ -417,7 +419,7 @@ function handleAddWeeklyHomework(e) {
     }
     
     const formData = new FormData(weeklyHomeworkForm);
-    const weeklyHomework = {
+    const weeklyData = {
         title: formData.get('title').trim(),
         subject: formData.get('subject'),
         dueDay: parseInt(formData.get('dueDay')),
@@ -426,29 +428,24 @@ function handleAddWeeklyHomework(e) {
         description: formData.get('description').trim(),
         startDate: formData.get('startDate'),
         endDate: formData.get('endDate') || null,
-        status: 'pending',
-        type: 'weekly',
+        isWeekly: true,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         userId: currentUser.uid
     };
     
     // Validate form
-    if (!weeklyHomework.title || !weeklyHomework.subject || weeklyHomework.dueDay === '' || !weeklyHomework.startDate) {
+    if (!weeklyData.title || !weeklyData.subject || weeklyData.dueDay === '' || !weeklyData.startDate) {
         alert('Please fill in all required fields');
         return;
     }
     
     showLoading(true);
     
-    // Create the weekly homework template
-    db.collection('weeklyHomework').add(weeklyHomework)
-        .then((docRef) => {
-            console.log('Weekly homework template created with ID:', docRef.id);
-            
-            // Generate individual homework assignments for the specified period
-            generateWeeklyAssignments(weeklyHomework, docRef.id);
-            
+    // Create the first weekly assignment
+    createFirstWeeklyAssignment(weeklyData)
+        .then(() => {
+            console.log('Weekly homework created successfully');
             weeklyHomeworkForm.reset();
             hideAuthError();
             closeWeeklyHomeworkModal();
@@ -462,229 +459,50 @@ function handleAddWeeklyHomework(e) {
         });
 }
 
-function generateWeeklyAssignments(weeklyTemplate, templateId) {
-    const startDate = new Date(weeklyTemplate.startDate);
-    const endDate = weeklyTemplate.endDate ? new Date(weeklyTemplate.endDate) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year from now if no end date
-    const dueDay = weeklyTemplate.dueDay;
+function createFirstWeeklyAssignment(weeklyData) {
+    const startDate = new Date(weeklyData.startDate);
+    const endDate = weeklyData.endDate ? new Date(weeklyData.endDate) : null;
     
-    const assignments = [];
-    let currentDate = new Date(startDate);
-    
-    // Find the first occurrence of the due day on or after the start date
-    while (currentDate.getDay() !== dueDay) {
-        currentDate.setDate(currentDate.getDate() + 1);
+    // Find the first occurrence of the due day after the start date
+    let dueDate = new Date(startDate);
+    while (dueDate.getDay() !== weeklyData.dueDay) {
+        dueDate.setDate(dueDate.getDate() + 1);
     }
     
-    // Generate assignments for each week
-    while (currentDate <= endDate) {
-        const assignment = {
-            title: weeklyTemplate.title,
-            subject: weeklyTemplate.subject,
-            dueDate: formatDateForInput(currentDate),
-            dueTime: weeklyTemplate.dueTime,
-            priority: weeklyTemplate.priority,
-            description: weeklyTemplate.description,
-            status: 'pending',
-            type: 'weekly',
-            weeklyTemplateId: templateId,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            userId: currentUser.uid
-        };
-        
-        assignments.push(assignment);
-        
-        // Move to next week
-        currentDate.setDate(currentDate.getDate() + 7);
+    // Check if we're within the end date range (if specified)
+    if (endDate && dueDate > endDate) {
+        throw new Error('No assignments can be created - the start date is after the end date for this weekly assignment.');
     }
     
-    // Add assignments to Firestore in batches
-    const batch = db.batch();
-    assignments.forEach(assignment => {
-        const docRef = db.collection('homework').doc();
-        batch.set(docRef, assignment);
-    });
+    // Create the first assignment
+    const assignment = {
+        title: weeklyData.title,
+        subject: weeklyData.subject,
+        dueDate: formatDateForInput(dueDate),
+        dueTime: weeklyData.dueTime,
+        priority: weeklyData.priority,
+        description: weeklyData.description,
+        status: 'pending',
+        isWeekly: true,
+        weeklyDay: weeklyData.dueDay,
+        weeklyEndDate: weeklyData.endDate,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        userId: currentUser.uid
+    };
     
-    return batch.commit()
-        .then(() => {
-            console.log(`Generated ${assignments.length} weekly assignments`);
-        })
-        .catch((error) => {
-            console.error('Error generating weekly assignments:', error);
-            alert('Weekly homework template created, but failed to generate individual assignments. Please try again.');
-        });
+    return db.collection('homework').add(assignment);
 }
 
 function resetWeeklyForm() {
     weeklyHomeworkForm.reset();
-    // Reset to default values
-    document.getElementById('weekly-time').value = '23:59';
-    document.getElementById('weekly-priority').value = 'medium';
-    // Set start date to today
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('weekly-start-date').value = today;
     
-    // Reset interactive elements
-    resetDaySelector();
-    resetPrioritySelector();
-    resetIndefiniteToggle();
-    updatePreview();
-}
-
-
-// Day selector functionality
-function setupDaySelector() {
-    const dayButtons = document.querySelectorAll('.day-btn');
-    dayButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const day = btn.dataset.day;
-            
-            // Update active state
-            dayButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            
-            // Update hidden input
-            document.getElementById('weekly-day').value = day;
-            updatePreview();
-        });
-    });
-}
-
-function resetDaySelector() {
-    document.querySelectorAll('.day-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    document.getElementById('weekly-day').value = '';
-}
-
-// Priority selector functionality
-function setupPrioritySelector() {
-    const priorityButtons = document.querySelectorAll('.priority-btn');
-    priorityButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const priority = btn.dataset.priority;
-            updatePrioritySelector(priority);
-            updatePreview();
-        });
-    });
-}
-
-function updatePrioritySelector(priority) {
-    const priorityButtons = document.querySelectorAll('.priority-btn');
-    priorityButtons.forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.dataset.priority === priority) {
-            btn.classList.add('active');
-        }
-    });
-    document.getElementById('weekly-priority').value = priority;
-}
-
-function resetPrioritySelector() {
-    updatePrioritySelector('medium');
-}
-
-// Indefinite toggle functionality
-function setupIndefiniteToggle() {
-    const toggleBtn = document.getElementById('toggle-indefinite');
-    const endDateInput = document.getElementById('weekly-end-date');
-    
-    toggleBtn.addEventListener('click', () => {
-        const isActive = toggleBtn.classList.contains('active');
-        
-        if (isActive) {
-            // Deactivate indefinite mode
-            toggleBtn.classList.remove('active');
-            endDateInput.disabled = false;
-            endDateInput.style.opacity = '1';
-        } else {
-            // Activate indefinite mode
-            toggleBtn.classList.add('active');
-            endDateInput.disabled = true;
-            endDateInput.style.opacity = '0.5';
-            endDateInput.value = '';
-        }
-        updatePreview();
-    });
-}
-
-function resetIndefiniteToggle() {
-    const toggleBtn = document.getElementById('toggle-indefinite');
-    const endDateInput = document.getElementById('weekly-end-date');
-    
-    toggleBtn.classList.remove('active');
-    endDateInput.disabled = false;
-    endDateInput.style.opacity = '1';
-}
-
-// Preview functionality
-function setupPreviewUpdates() {
-    const formInputs = [
-        'weekly-title',
-        'weekly-subject', 
-        'weekly-day',
-        'weekly-time',
-        'weekly-start-date',
-        'weekly-end-date',
-        'weekly-priority'
-    ];
-    
-    formInputs.forEach(inputId => {
-        const input = document.getElementById(inputId);
-        if (input) {
-            input.addEventListener('input', updatePreview);
-            input.addEventListener('change', updatePreview);
-        }
-    });
-}
-
-function updatePreview() {
-    const title = document.getElementById('weekly-title').value || 'Assignment Title';
-    const day = document.getElementById('weekly-day').value;
-    const time = document.getElementById('weekly-time').value;
-    const startDate = document.getElementById('weekly-start-date').value;
-    const endDate = document.getElementById('weekly-end-date').value;
-    const isIndefinite = document.getElementById('toggle-indefinite').classList.contains('active');
-    
-    // Update title
-    document.getElementById('preview-title').textContent = title;
-    
-    // Update due date
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const dayName = day ? dayNames[parseInt(day)] : 'Day';
-    const timeDisplay = time ? formatTime(time) : '11:59 PM';
-    document.getElementById('preview-date').textContent = `Due: ${dayName} at ${timeDisplay}`;
-    
-    // Update count
-    if (startDate) {
-        const count = calculateAssignmentCount(startDate, endDate, isIndefinite);
-        document.getElementById('preview-count').textContent = count;
-        document.getElementById('preview-period').textContent = count === 1 ? 'assignment will be created' : 'assignments will be created';
-    } else {
-        document.getElementById('preview-count').textContent = '0';
-        document.getElementById('preview-period').textContent = 'assignments will be created';
+    // Reset time indicator
+    if (weeklyDueTimeInput && weeklyTimeIndicator) {
+        updateTimeIndicator(weeklyDueTimeInput, weeklyTimeIndicator);
     }
 }
 
-function calculateAssignmentCount(startDate, endDate, isIndefinite) {
-    if (!startDate) return 0;
-    
-    const start = new Date(startDate);
-    const end = isIndefinite ? new Date(start.getTime() + (365 * 24 * 60 * 60 * 1000)) : new Date(endDate);
-    
-    if (!endDate && !isIndefinite) return 0;
-    
-    const weeks = Math.ceil((end - start) / (7 * 24 * 60 * 60 * 1000));
-    return Math.max(1, weeks);
-}
-
-function formatTime(timeString) {
-    const [hours, minutes] = timeString.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    return `${displayHour}:${minutes} ${ampm}`;
-}
 
 // Class Management Functions
 function openClassManagementModal() {
@@ -1002,23 +820,37 @@ function updateClassDropdowns() {
     const subjectSelect = document.getElementById('subject');
     const weeklySubjectSelect = document.getElementById('weekly-subject');
     
-    // Clear existing options except the first one
-    [subjectSelect, weeklySubjectSelect].forEach(select => {
-        if (select) {
-            // Keep the first option (Select Class)
-            const firstOption = select.querySelector('option');
-            select.innerHTML = '';
-            select.appendChild(firstOption);
-            
-            // Add class options
-            classesList.forEach(classItem => {
-                const option = document.createElement('option');
-                option.value = classItem.className;
-                option.textContent = classItem.className;
-                select.appendChild(option);
-            });
-        }
-    });
+    // Update regular homework dropdown
+    if (subjectSelect) {
+        // Keep the first option (Select Class)
+        const firstOption = subjectSelect.querySelector('option');
+        subjectSelect.innerHTML = '';
+        subjectSelect.appendChild(firstOption);
+        
+        // Add class options
+        classesList.forEach(classItem => {
+            const option = document.createElement('option');
+            option.value = classItem.className;
+            option.textContent = classItem.className;
+            subjectSelect.appendChild(option);
+        });
+    }
+    
+    // Update weekly homework dropdown
+    if (weeklySubjectSelect) {
+        // Keep the first option (Select Class)
+        const firstOption = weeklySubjectSelect.querySelector('option');
+        weeklySubjectSelect.innerHTML = '';
+        weeklySubjectSelect.appendChild(firstOption);
+        
+        // Add class options
+        classesList.forEach(classItem => {
+            const option = document.createElement('option');
+            option.value = classItem.className;
+            option.textContent = classItem.className;
+            weeklySubjectSelect.appendChild(option);
+        });
+    }
 }
 
 // Time indicator functions
@@ -1093,6 +925,8 @@ function setupRealtimeListener() {
         });
         
         console.log('Homework list updated:', homeworkList);
+        
+        // Render homework list
         renderHomeworkList();
     }, (error) => {
         console.error('Error listening to homework updates:', error);
@@ -1115,9 +949,61 @@ function renderHomeworkList() {
     renderClassNavigation();
     
     // Filter by selected class
-    const classFilteredHomework = selectedClass === 'all' 
+    let classFilteredHomework = selectedClass === 'all' 
         ? homeworkList 
         : homeworkList.filter(homework => homework.subject === selectedClass);
+    
+    // Apply the same filtering logic used for counting
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Today at midnight
+    
+    const beforeFilterCount = classFilteredHomework.length;
+    classFilteredHomework = classFilteredHomework.filter(homework => {
+        // If it's not weekly homework, always show it
+        if (!homework.isWeekly) {
+            return true;
+        }
+        
+        // For weekly homework, check if it should be shown
+        if (homework.dueDate) {
+            const dueDate = homework.dueDate.toDate ? homework.dueDate.toDate() : new Date(homework.dueDate);
+            const homeworkDueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+            
+            // If it's due today or in the past, always show it
+            if (homeworkDueDate <= today) {
+                return true;
+            }
+            
+            // If it's due in the future, check if it's a "next week" assignment
+            // and if the "current week" assignment's due date has passed
+            const isNextWeekAssignment = homeworkDueDate > today;
+            
+            if (isNextWeekAssignment) {
+                // For weekly assignments due in the future, show them if they're due within the next 7 days
+                // This prevents clutter from assignments too far in the future
+                const daysUntilDue = Math.ceil((homeworkDueDate - today) / (1000 * 60 * 60 * 24));
+                if (daysUntilDue <= 7) {
+                    console.log(`Showing weekly assignment: ${homework.title} (due in ${daysUntilDue} days)`);
+                    return true;
+                } else {
+                    console.log(`Hiding weekly assignment: ${homework.title} (due in ${daysUntilDue} days, too far in future)`);
+                    return false;
+                }
+            }
+            
+            // Default: hide future assignments
+            console.log(`Hiding future weekly assignment: ${homework.title} (due ${homeworkDueDate.toDateString()})`);
+            return false;
+        }
+        
+        // If no due date, show it
+        return true;
+    });
+    
+    const filteredOutCount = beforeFilterCount - classFilteredHomework.length;
+    if (filteredOutCount > 0) {
+        console.log(`Filtered out ${filteredOutCount} future weekly assignments`);
+    }
     
     // Update section title
     if (selectedClass === 'all') {
@@ -1243,6 +1129,46 @@ function renderHomeworkList() {
     addActionButtonListeners();
 }
 
+function getVisibleHomeworkCount(homeworkArray) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Today at midnight
+    
+    return homeworkArray.filter(homework => {
+        // If it's not weekly homework, always show it
+        if (!homework.isWeekly) {
+            return true;
+        }
+        
+        // For weekly homework, check if it should be shown
+        if (homework.dueDate) {
+            const dueDate = homework.dueDate.toDate ? homework.dueDate.toDate() : new Date(homework.dueDate);
+            const homeworkDueDate = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+            
+            // If it's due today or in the past, always show it
+            if (homeworkDueDate <= today) {
+                return true;
+            }
+            
+            // If it's due in the future, check if it's a "next week" assignment
+            // and if the "current week" assignment's due date has passed
+            const isNextWeekAssignment = homeworkDueDate > today;
+            
+            if (isNextWeekAssignment) {
+                // For weekly assignments due in the future, show them if they're due within the next 7 days
+                // This prevents clutter from assignments too far in the future
+                const daysUntilDue = Math.ceil((homeworkDueDate - today) / (1000 * 60 * 60 * 24));
+                return daysUntilDue <= 7;
+            }
+            
+            // Default: hide future assignments
+            return false;
+        }
+        
+        // If no due date, show it
+        return true;
+    }).length;
+}
+
 function renderClassNavigation() {
     const classNavElement = document.getElementById('classNav');
     
@@ -1254,17 +1180,17 @@ function renderClassNavigation() {
     const allClassNames = classesList.map(classItem => classItem.className);
     console.log('allClassNames:', allClassNames);
     
-    // Create navigation buttons
+    // Create navigation buttons with consistent filtering
     const navButtons = [
         {
             id: 'all',
             name: 'All Classes',
-            count: homeworkList.length
+            count: getVisibleHomeworkCount(homeworkList)
         },
         ...allClassNames.map(className => ({
             id: className,
             name: className,
-            count: homeworkList.filter(homework => homework.subject === className).length
+            count: getVisibleHomeworkCount(homeworkList.filter(homework => homework.subject === className))
         }))
     ];
     
@@ -1327,8 +1253,6 @@ function createHomeworkItemHTML(homework) {
         }
     }
     
-    const isWeekly = homework.type === 'weekly';
-    const weeklyIndicator = isWeekly ? '<i class="fas fa-calendar-week weekly-indicator" title="Weekly Assignment"></i>' : '';
     
     // Determine neon status class
     let neonStatusClass = '';
@@ -1348,11 +1272,11 @@ function createHomeworkItemHTML(homework) {
     }
     
     return `
-        <div class="homework-item ${homework.status} ${homework.priority || 'medium'}-priority ${isOverdue ? 'overdue' : ''} ${isWeekly ? 'weekly-homework' : ''} ${neonStatusClass}" data-id="${homework.id}">
+        <div class="homework-item ${homework.status} ${homework.priority || 'medium'}-priority ${isOverdue ? 'overdue' : ''} ${neonStatusClass}" data-id="${homework.id}">
             <div class="homework-main">
                 <h3 class="homework-title">
-                    ${weeklyIndicator}
                     ${escapeHtml(homework.title)}
+                    ${homework.isWeekly ? '<span class="weekly-indicator" title="Weekly Assignment"><i class="fas fa-calendar-week"></i></span>' : ''}
                 </h3>
                 <span class="homework-subject">${escapeHtml(homework.subject)}</span>
             </div>
@@ -1431,7 +1355,16 @@ function editHomework(id) {
     }
     console.log('Found homework for editing:', homework);
     
-    // Populate form with existing data
+    // Check if this is weekly homework
+    if (homework.isWeekly) {
+        editWeeklyHomework(homework);
+    } else {
+        editRegularHomework(homework);
+    }
+}
+
+function editRegularHomework(homework) {
+    // Populate regular homework form with existing data
     document.getElementById('title').value = homework.title;
     document.getElementById('subject').value = homework.subject;
     document.getElementById('due-date').value = homework.dueDate;
@@ -1456,11 +1389,49 @@ function editHomework(id) {
     // Update form to edit mode
     const submitBtn = document.querySelector('.submit-btn');
     submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Homework';
-    submitBtn.dataset.editId = id;
+    submitBtn.dataset.editId = homework.id;
     
     // Change form handler temporarily
     homeworkForm.removeEventListener('submit', handleAddHomework);
-    homeworkForm.addEventListener('submit', (e) => handleUpdateHomework(e, id));
+    homeworkForm.addEventListener('submit', (e) => handleUpdateHomework(e, homework.id));
+}
+
+function editWeeklyHomework(homework) {
+    // Populate weekly homework form with existing data
+    document.getElementById('weekly-title').value = homework.title;
+    document.getElementById('weekly-subject').value = homework.subject;
+    document.getElementById('weekly-due-day').value = homework.weeklyDay || '';
+    document.getElementById('weekly-due-time').value = homework.dueTime || '23:59';
+    document.getElementById('weekly-priority').value = homework.priority || '';
+    document.getElementById('weekly-description').value = homework.description || '';
+    
+    // Set start date (use the original start date if available, otherwise use current due date)
+    if (homework.startDate) {
+        document.getElementById('weekly-start-date').value = homework.startDate;
+    } else if (homework.dueDate) {
+        // Convert due date to start date format
+        const dueDate = homework.dueDate.toDate ? homework.dueDate.toDate() : new Date(homework.dueDate);
+        const startDate = new Date(dueDate);
+        startDate.setDate(startDate.getDate() - (homework.weeklyDay || 0)); // Go back to start of week
+        document.getElementById('weekly-start-date').value = startDate.toISOString().split('T')[0];
+    }
+    
+    // Set end date if available
+    if (homework.endDate) {
+        document.getElementById('weekly-end-date').value = homework.endDate;
+    }
+    
+    // Open weekly homework modal for editing
+    openWeeklyHomeworkModal();
+    
+    // Update form to edit mode
+    const submitBtn = document.querySelector('#weekly-homework-form .submit-btn');
+    submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Weekly Assignment';
+    submitBtn.dataset.editId = homework.id;
+    
+    // Change form handler temporarily
+    weeklyHomeworkForm.removeEventListener('submit', handleAddWeeklyHomework);
+    weeklyHomeworkForm.addEventListener('submit', (e) => handleUpdateWeeklyHomework(e, homework.id));
 }
 
 function handleUpdateHomework(e, id) {
@@ -1493,6 +1464,60 @@ function handleUpdateHomework(e, id) {
         });
 }
 
+function handleUpdateWeeklyHomework(e, id) {
+    e.preventDefault();
+    
+    if (!currentUser) {
+        showAuthError('Please sign in to update weekly homework');
+        return;
+    }
+    
+    const formData = new FormData(weeklyHomeworkForm);
+    const updatedWeeklyData = {
+        title: formData.get('title').trim(),
+        subject: formData.get('subject'),
+        weeklyDay: parseInt(formData.get('dueDay')), // Use weeklyDay for database field
+        dueTime: formData.get('dueTime') || '23:59',
+        priority: formData.get('priority') || 'medium',
+        description: formData.get('description').trim(),
+        startDate: formData.get('startDate'),
+        endDate: formData.get('endDate') || null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    // Validate form
+    if (!updatedWeeklyData.title || !updatedWeeklyData.subject || updatedWeeklyData.weeklyDay === '' || !updatedWeeklyData.startDate) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    // Calculate new due date based on updated weeklyDay and startDate
+    const startDate = new Date(updatedWeeklyData.startDate);
+    let dueDate = new Date(startDate);
+    while (dueDate.getDay() !== updatedWeeklyData.weeklyDay) {
+        dueDate.setDate(dueDate.getDate() + 1);
+    }
+    updatedWeeklyData.dueDate = formatDateForInput(dueDate);
+    
+    showLoading(true);
+    
+    // Update the weekly homework
+    db.collection('homework').doc(id).update(updatedWeeklyData)
+        .then(() => {
+            console.log('Weekly homework updated successfully');
+            weeklyHomeworkForm.reset();
+            hideAuthError();
+            closeWeeklyHomeworkModal();
+        })
+        .catch((error) => {
+            console.error('Error updating weekly homework:', error);
+            alert('Failed to update weekly homework. Please try again.');
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+}
+
 function deleteHomework(id) {
     console.log('deleteHomework called with ID:', id);
     if (!confirm('Are you sure you want to delete this homework?')) {
@@ -1516,11 +1541,17 @@ function deleteHomework(id) {
         });
 }
 
+// REMOVED: Complex weekly homework status checking
+// New system handles weekly homework automatically when marked complete
+
 function markHomeworkCompleted(id) {
     console.log('markHomeworkCompleted called with ID:', id);
     
     // Trigger celebration animation immediately for responsive feedback
     triggerCelebrationAnimation();
+    
+    // Find the homework item to check if it's weekly
+    const homeworkItem = homeworkList.find(h => h.id === id);
     
     // Update database in background
     db.collection('homework').doc(id).update({
@@ -1530,11 +1561,88 @@ function markHomeworkCompleted(id) {
     })
     .then(() => {
         console.log('Homework marked as completed successfully');
+        
+        // NEW SIMPLE LOGIC: If this is weekly homework, create next week's assignment immediately
+        if (homeworkItem && homeworkItem.isWeekly && homeworkItem.weeklyDay !== undefined) {
+            createNextWeekAssignment(homeworkItem);
+        }
     })
     .catch((error) => {
         console.error('Error marking homework as completed:', error);
         alert('Failed to mark homework as completed. Please try again.');
     });
+}
+
+function createNextWeekAssignment(completedHomework) {
+    console.log('Creating next week assignment from completed homework:', completedHomework);
+    
+    const now = new Date();
+    const dayOfWeek = completedHomework.weeklyDay;
+    
+    // Find next week's occurrence of this day
+    let nextDate = new Date(now);
+    
+    // Find the current week's occurrence of this day
+    while (nextDate.getDay() !== dayOfWeek) {
+        nextDate.setDate(nextDate.getDate() + 1);
+    }
+    
+    // Move to next week
+    nextDate.setDate(nextDate.getDate() + 7);
+    
+    // Check if we're within the end date range (if specified)
+    if (completedHomework.weeklyEndDate) {
+        const endDate = new Date(completedHomework.weeklyEndDate);
+        if (nextDate > endDate) {
+            console.log('Next weekly assignment would be after end date, skipping creation');
+            return;
+        }
+    }
+    
+    // SAFETY CHECK: Prevent duplicate creation by checking if next week's assignment already exists
+    const nextWeekDateString = formatDateForInput(nextDate);
+    const existingAssignment = homeworkList.find(h => 
+        h.title === completedHomework.title && 
+        h.subject === completedHomework.subject && 
+        h.dueDate === nextWeekDateString &&
+        h.isWeekly === true
+    );
+    
+    if (existingAssignment) {
+        console.log('Next week assignment already exists, skipping creation:', existingAssignment.id);
+        return;
+    }
+    
+    // Parse the due time
+    const [hours, minutes] = completedHomework.dueTime.split(':').map(Number);
+    const dueDateTime = new Date(nextDate);
+    dueDateTime.setHours(hours, minutes, 0, 0);
+    
+    // Create the next assignment using the completed homework's data
+    const nextAssignment = {
+        title: completedHomework.title,
+        subject: completedHomework.subject,
+        dueDate: formatDateForInput(dueDateTime),
+        dueTime: completedHomework.dueTime,
+        priority: completedHomework.priority,
+        description: completedHomework.description,
+        status: 'pending',
+        isWeekly: true,
+        weeklyDay: completedHomework.weeklyDay,
+        weeklyEndDate: completedHomework.weeklyEndDate,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        userId: currentUser.uid
+    };
+    
+    // Add to database
+    db.collection('homework').add(nextAssignment)
+        .then((docRef) => {
+            console.log('Next week assignment created with ID:', docRef.id, 'for next week:', nextDate.toDateString());
+        })
+        .catch((error) => {
+            console.error('Error creating next week assignment:', error);
+        });
 }
 
 function markHomeworkPending(id) {

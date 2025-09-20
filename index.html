@@ -116,9 +116,8 @@
                     <p class="content-subtitle">Stay organized and never miss a deadline</p>
                 </div>
                 <div class="action-buttons">
-                    <button id="manage-classes-btn" class="manage-classes-btn btn-neon-bar">
+                    <button id="manage-classes-btn" class="manage-classes-btn btn-square" title="Manage Classes">
                         <i class="fas fa-graduation-cap"></i>
-                        Manage Classes
                     </button>
                     <button id="add-weekly-homework-btn" class="add-weekly-homework-btn btn-neon-bar">
                         <i class="fas fa-calendar-week"></i>
@@ -269,135 +268,6 @@
         </div>
     </div>
 
-    <!-- Weekly Homework Modal -->
-    <div id="weekly-homework-modal" class="modal hidden">
-        <div class="modal-content weekly-modal-content">
-            <div class="modal-header">
-                <h2>Set Weekly Homework</h2>
-                <button id="close-weekly-modal" class="close-modal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-
-            <form id="weekly-homework-form" class="homework-form">
-                <!-- Basic Info Section -->
-                <div class="form-section">
-                    <h3>Assignment Details</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="weekly-title">Title</label>
-                            <input type="text" id="weekly-title" name="title" placeholder="e.g., Pre-lab Assignment" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="weekly-subject">Class</label>
-                            <select id="weekly-subject" name="subject" required>
-                                <option value="">Select Class</option>
-                                <!-- Classes will be dynamically populated -->
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Schedule Section -->
-                <div class="form-section">
-                    <h3>Schedule</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="weekly-day">Due Day</label>
-                            <div class="day-selector">
-                                <button type="button" class="day-btn" data-day="1">Mon</button>
-                                <button type="button" class="day-btn" data-day="2">Tue</button>
-                                <button type="button" class="day-btn" data-day="3">Wed</button>
-                                <button type="button" class="day-btn" data-day="4">Thu</button>
-                                <button type="button" class="day-btn" data-day="5">Fri</button>
-                                <button type="button" class="day-btn" data-day="6">Sat</button>
-                                <button type="button" class="day-btn" data-day="0">Sun</button>
-                            </div>
-                            <input type="hidden" id="weekly-day" name="dueDay" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="weekly-time">Due Time</label>
-                            <div class="time-input-container">
-                                <input type="time" id="weekly-time" name="dueTime" value="23:59">
-                                <span class="time-indicator" id="weeklyTimeIndicator">Evening</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Duration Section -->
-                <div class="form-section">
-                    <h3>Duration</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="weekly-start-date">Start Date</label>
-                            <input type="date" id="weekly-start-date" name="startDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="weekly-end-date">End Date</label>
-                            <div class="end-date-container">
-                                <input type="date" id="weekly-end-date" name="endDate">
-                                <button type="button" class="toggle-indefinite" id="toggle-indefinite">
-                                    <i class="fas fa-infinity"></i>
-                                    <span>Indefinite</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Priority Section -->
-                <div class="form-section">
-                    <h3>Priority</h3>
-                    <div class="priority-selector">
-                        <button type="button" class="priority-btn" data-priority="low">
-                            <i class="fas fa-arrow-down"></i>
-                            <span>Low</span>
-                        </button>
-                        <button type="button" class="priority-btn active" data-priority="medium">
-                            <i class="fas fa-minus"></i>
-                            <span>Medium</span>
-                        </button>
-                        <button type="button" class="priority-btn" data-priority="high">
-                            <i class="fas fa-arrow-up"></i>
-                            <span>High</span>
-                        </button>
-                    </div>
-                    <input type="hidden" id="weekly-priority" name="priority" value="medium">
-                </div>
-
-                <!-- Preview Section -->
-                <div class="form-section preview-section">
-                    <h3>Preview</h3>
-                    <div class="assignment-preview">
-                        <div class="preview-item">
-                            <span class="preview-title" id="preview-title">Assignment Title</span>
-                            <span class="preview-date" id="preview-date">Due: Monday at 11:59 PM</span>
-                        </div>
-                        <div class="preview-count">
-                            <span id="preview-count">0</span>
-                            <span id="preview-period">assignments will be created</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Description Section -->
-                <div class="form-section">
-                    <h3>Description (Optional)</h3>
-                    <textarea id="weekly-description" name="description" rows="3" placeholder="Add any additional details..."></textarea>
-                </div>
-
-                <div class="modal-actions">
-                    <button type="button" id="cancel-weekly-btn" class="cancel-btn">Cancel</button>
-                    <button type="submit" class="submit-btn">
-                        <i class="fas fa-calendar-week"></i>
-                        Create Weekly Assignment
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <!-- Class Management Modal -->
     <div id="class-management-modal" class="modal hidden">
@@ -469,6 +339,93 @@
         </div>
     </div>
 
+    <!-- Weekly Homework Modal -->
+    <div id="weekly-homework-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create Weekly Assignment</h2>
+                <button id="close-weekly-modal" class="close-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="weekly-homework-form" class="homework-form">
+                <div class="form-grid">
+                    <!-- Row 1: Title (full width) -->
+                    <div class="form-group form-group-full">
+                        <label for="weekly-title">Assignment Title</label>
+                        <input type="text" id="weekly-title" name="title" placeholder="e.g., Weekly Prelab Report" class="form-neon-bar" required>
+                    </div>
+                    
+                    <!-- Row 2: Subject and Priority (side by side) -->
+                    <div class="form-group">
+                        <label for="weekly-subject">Class</label>
+                        <select id="weekly-subject" name="subject" class="form-neon-bar" required>
+                            <option value="">Select Class</option>
+                            <!-- Classes will be dynamically populated -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="weekly-priority">Priority</label>
+                        <select id="weekly-priority" name="priority" class="form-neon-bar">
+                            <option value="">Select Priority</option>
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Row 3: Due Day and Due Time (side by side) -->
+                    <div class="form-group">
+                        <label for="weekly-due-day">Due Day</label>
+                        <select id="weekly-due-day" name="dueDay" class="form-neon-bar" required>
+                            <option value="">Select Day</option>
+                            <option value="0">Sunday</option>
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="weekly-due-time">Due Time</label>
+                        <div class="time-input-container">
+                            <input type="time" id="weekly-due-time" name="dueTime" value="23:59" class="form-neon-bar">
+                            <span class="time-indicator" id="weeklyTimeIndicator">Evening</span>
+                        </div>
+                        <small class="form-help">Default: 23:59 (11:59 PM)</small>
+                    </div>
+                    
+                    <!-- Row 4: Start Date and End Date (side by side) -->
+                    <div class="form-group">
+                        <label for="weekly-start-date">Start Date</label>
+                        <input type="date" id="weekly-start-date" name="startDate" class="form-neon-bar" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="weekly-end-date">End Date (Optional)</label>
+                        <input type="date" id="weekly-end-date" name="endDate" class="form-neon-bar">
+                        <small class="form-help">Leave empty for indefinite weekly assignments</small>
+                    </div>
+                    
+                    <!-- Row 5: Description (full width) -->
+                    <div class="form-group form-group-full">
+                        <label for="weekly-description">Description (Optional)</label>
+                        <textarea id="weekly-description" name="description" rows="4" placeholder="Add any additional details about this weekly assignment..." class="form-neon-bar"></textarea>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" id="cancel-weekly-btn" class="cancel-btn">Cancel</button>
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-calendar-week"></i>
+                        Create Weekly Assignment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Past Homework Modal -->
     <div id="pastHomeworkModal" class="past-homework-modal">
         <div class="past-homework-modal-content">
@@ -517,16 +474,78 @@
     </script>
     <script src="app.js"></script>
     
-    <!-- Test button for celebration animation -->
-    <div style="position: fixed; top: 10px; right: 10px; z-index: 9999;">
+    <!-- Test buttons -->
+    <div style="position: fixed; top: 10px; right: 10px; z-index: 9999; display: flex; gap: 8px;">
         <button onclick="testCelebrationAnimation()" style="background: var(--accent-success); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 2px 8px rgba(56, 161, 105, 0.3); font-size: 0.9rem;">
             🎉 Test Animation
+        </button>
+        <button onclick="clearAllHomework()" style="background: var(--accent-danger); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3); font-size: 0.9rem;">
+            🗑️ Clear All
         </button>
     </div>
     
     <script>
         function testCelebrationAnimation() {
             triggerCelebrationAnimation();
+        }
+        
+        function clearAllHomework() {
+            // Show confirmation dialog
+            const confirmed = confirm('⚠️ WARNING: This will delete ALL homework assignments permanently!\n\nThis action cannot be undone.\n\nAre you sure you want to continue?');
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            // Double confirmation for safety
+            const doubleConfirmed = confirm('🚨 FINAL WARNING 🚨\n\nYou are about to delete ALL homework assignments.\n\nType "DELETE ALL" in the next prompt to confirm.');
+            
+            if (!doubleConfirmed) {
+                return;
+            }
+            
+            const userInput = prompt('Type "DELETE ALL" to confirm deletion:');
+            
+            if (userInput !== 'DELETE ALL') {
+                alert('❌ Deletion cancelled. You must type "DELETE ALL" exactly.');
+                return;
+            }
+            
+            // Show loading
+            showLoading(true);
+            
+            // Get all homework for current user
+            db.collection('homework')
+                .where('userId', '==', currentUser.uid)
+                .get()
+                .then((querySnapshot) => {
+                    if (querySnapshot.empty) {
+                        showLoading(false);
+                        alert('✅ No homework assignments found to delete.');
+                        return;
+                    }
+                    
+                    const batch = db.batch();
+                    let deleteCount = 0;
+                    
+                    querySnapshot.forEach((doc) => {
+                        batch.delete(doc.ref);
+                        deleteCount++;
+                    });
+                    
+                    return batch.commit().then(() => {
+                        showLoading(false);
+                        alert(`✅ Successfully deleted ${deleteCount} homework assignment(s)!`);
+                        
+                        // Refresh the homework list
+                        loadHomework();
+                    });
+                })
+                .catch((error) => {
+                    showLoading(false);
+                    console.error('Error deleting homework:', error);
+                    alert('❌ Failed to delete homework assignments. Please try again.');
+                });
         }
     </script>
 </body>
