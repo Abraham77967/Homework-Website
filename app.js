@@ -18,9 +18,67 @@ const analytics = firebase.analytics();
 // Global variables
 let currentUser = null;
 let homeworkList = [];
+let classesList = [];
 let selectedClass = 'all';
 let unsubscribe = null;
-let currentTheme = 'light';
+let classesUnsubscribe = null;
+
+// Debug function - call this from browser console to test Firebase connection
+window.testFirebaseConnection = function() {
+    console.log('=== Firebase Connection Test ===');
+    console.log('Current user:', currentUser);
+    console.log('Firebase app:', app);
+    console.log('Firestore instance:', db);
+    
+    if (!currentUser) {
+        console.error('❌ No authenticated user');
+        return;
+    }
+    
+    // Test reading from classes collection
+    db.collection('classes').where('userId', '==', currentUser.uid).get()
+        .then((snapshot) => {
+            console.log('✅ Successfully read classes collection');
+            console.log('Number of classes:', snapshot.size);
+            snapshot.forEach((doc) => {
+                console.log('Class:', doc.id, doc.data());
+            });
+        })
+        .catch((error) => {
+            console.error('❌ Error reading classes:', error);
+        });
+    
+    // Test writing to classes collection
+    const testClass = {
+        className: 'Test Class',
+        userId: currentUser.uid,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    db.collection('classes').add(testClass)
+        .then((docRef) => {
+            console.log('✅ Successfully wrote to classes collection');
+            console.log('Test class ID:', docRef.id);
+            
+            // Clean up test class
+            return docRef.delete();
+        })
+        .then(() => {
+            console.log('✅ Test class cleaned up');
+        })
+        .catch((error) => {
+            console.error('❌ Error writing to classes:', error);
+            console.error('Error details:', {
+                code: error.code,
+                message: error.message,
+                stack: error.stack
+            });
+        });
+};
+
+// Calendar variables
+let currentCalendarDate = new Date();
+let selectedDate = null;
 
 // DOM elements
 const authSection = document.getElementById('auth-section');
@@ -34,11 +92,52 @@ const homeworkForm = document.getElementById('homework-form');
 const homeworkListElement = document.getElementById('homework-list');
 const emptyState = document.getElementById('empty-state');
 const loadingSpinner = document.getElementById('loading-spinner');
-const filterPriority = document.getElementById('filter-priority');
-const filterStatus = document.getElementById('filter-status');
-const sortBy = document.getElementById('sort-by');
+const homeworkSectionTitle = document.getElementById('homework-section-title');
 const themeToggle = document.getElementById('theme-toggle');
 const themeIcon = document.getElementById('theme-icon');
+// Theme label removed - now icon-only design
+const themeDropdown = document.getElementById('theme-dropdown');
+const themeOptions = document.querySelectorAll('.theme-option');
+const addHomeworkBtn = document.getElementById('add-homework-btn');
+const addHomeworkModal = document.getElementById('add-homework-modal');
+const closeModalBtn = document.getElementById('close-modal');
+const cancelBtn = document.getElementById('cancel-btn');
+
+// Weekly homework elements
+const addWeeklyHomeworkBtn = document.getElementById('add-weekly-homework-btn');
+const weeklyHomeworkModal = document.getElementById('weekly-homework-modal');
+const weeklyHomeworkForm = document.getElementById('weekly-homework-form');
+const closeWeeklyModalBtn = document.getElementById('close-weekly-modal');
+const cancelWeeklyBtn = document.getElementById('cancel-weekly-btn');
+
+// Class management elements
+const manageClassesBtn = document.getElementById('manage-classes-btn');
+const classManagementModal = document.getElementById('class-management-modal');
+const classForm = document.getElementById('class-form');
+const closeClassModalBtn = document.getElementById('close-class-modal');
+const cancelClassBtn = document.getElementById('cancel-class-btn');
+const classesListElement = document.getElementById('classes-list');
+const noClassesState = document.getElementById('no-classes-state');
+const classColorInput = document.getElementById('class-color');
+const colorPreview = document.getElementById('color-preview');
+
+// Time input elements
+const dueTimeInput = document.getElementById('due-time');
+const weeklyTimeInput = document.getElementById('weekly-time');
+const timeIndicator = document.getElementById('timeIndicator');
+const weeklyTimeIndicator = document.getElementById('weeklyTimeIndicator');
+
+// Calendar elements
+const calendarBtn = document.getElementById('calendar-btn');
+const calendarModal = document.getElementById('calendar-modal');
+const calendarCloseBtn = document.getElementById('calendar-close-btn');
+const dueDateInput = document.getElementById('due-date');
+const calendarMonthYear = document.getElementById('calendar-month-year');
+const calendarDays = document.getElementById('calendar-days');
+const prevMonthBtn = document.getElementById('prev-month');
+const nextMonthBtn = document.getElementById('next-month');
+const todayBtn = document.getElementById('today-btn');
+const clearDateBtn = document.getElementById('clear-date-btn');
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -61,14 +160,72 @@ function setupEventListeners() {
     googleSigninBtn.addEventListener('click', signInWithGoogle);
     signoutBtn.addEventListener('click', handleSignOut);
     
+    // Modal functionality
+    addHomeworkBtn.addEventListener('click', openAddHomeworkModal);
+    closeModalBtn.addEventListener('click', closeAddHomeworkModal);
+    cancelBtn.addEventListener('click', closeAddHomeworkModal);
+    
+    // Weekly homework modal functionality
+    addWeeklyHomeworkBtn.addEventListener('click', openWeeklyHomeworkModal);
+    closeWeeklyModalBtn.addEventListener('click', closeWeeklyHomeworkModal);
+    cancelWeeklyBtn.addEventListener('click', closeWeeklyHomeworkModal);
+    
+    // Class management modal functionality
+    manageClassesBtn.addEventListener('click', openClassManagementModal);
+    closeClassModalBtn.addEventListener('click', closeClassManagementModal);
+    cancelClassBtn.addEventListener('click', closeClassManagementModal);
+    
+    // Time input indicators
+    if (dueTimeInput && timeIndicator) {
+        dueTimeInput.addEventListener('input', () => updateTimeIndicator(dueTimeInput, timeIndicator));
+        // Initialize with current value or default
+        updateTimeIndicator(dueTimeInput, timeIndicator);
+    }
+    
+    if (weeklyTimeInput && weeklyTimeIndicator) {
+        weeklyTimeInput.addEventListener('input', () => updateTimeIndicator(weeklyTimeInput, weeklyTimeIndicator));
+        // Initialize with current value or default
+        updateTimeIndicator(weeklyTimeInput, weeklyTimeIndicator);
+    }
+    
+    // Close modal when clicking outside
+    addHomeworkModal.addEventListener('click', (e) => {
+        if (e.target === addHomeworkModal) {
+            closeAddHomeworkModal();
+        }
+    });
+    
+    weeklyHomeworkModal.addEventListener('click', (e) => {
+        if (e.target === weeklyHomeworkModal) {
+            closeWeeklyHomeworkModal();
+        }
+    });
+    
+    classManagementModal.addEventListener('click', (e) => {
+        if (e.target === classManagementModal) {
+            closeClassManagementModal();
+        }
+    });
+    
     // Form submission
     homeworkForm.addEventListener('submit', handleAddHomework);
+    weeklyHomeworkForm.addEventListener('submit', handleAddWeeklyHomework);
+    classForm.addEventListener('submit', handleAddClass);
     
-    // Filters and sorting
-    filterSubject.addEventListener('change', filterAndSortHomework);
-    filterPriority.addEventListener('change', filterAndSortHomework);
-    filterStatus.addEventListener('change', filterAndSortHomework);
-    sortBy.addEventListener('change', filterAndSortHomework);
+    // Color picker functionality
+    if (classColorInput && colorPreview) {
+        classColorInput.addEventListener('input', updateColorPreview);
+        updateColorPreview(); // Initialize
+    }
+    
+    // Calendar functionality
+    setupCalendarEventListeners();
+    
+    // Weekly homework interactive elements
+    setupDaySelector();
+    setupPrioritySelector();
+    setupIndefiniteToggle();
+    setupPreviewUpdates();
 }
 
 // Authentication functions
@@ -109,10 +266,12 @@ function handleAuthStateChange(user) {
         showApp();
         updateUserInfo(user);
         setupRealtimeListener();
+        setupClassesListener();
     } else {
         currentUser = null;
         showAuth();
         cleanupRealtimeListener();
+        cleanupClassesListener();
     }
 }
 
@@ -126,6 +285,10 @@ function showApp() {
     appSection.classList.add('hidden');
     setTimeout(() => {
         appSection.classList.remove('hidden');
+        // Ensure class navigation is rendered when app is shown
+        if (classesList && classesList.length > 0) {
+            renderClassNavigation();
+        }
     }, 100);
 }
 
@@ -144,6 +307,59 @@ function hideAuthError() {
     authError.style.display = 'none';
 }
 
+// Modal functions
+function openAddHomeworkModal() {
+    addHomeworkModal.classList.remove('hidden');
+    // Trigger animation by adding show class after a brief delay
+    setTimeout(() => {
+        addHomeworkModal.classList.add('show');
+    }, 10);
+    // Focus on first input after animation starts
+    setTimeout(() => {
+        document.getElementById('title').focus();
+    }, 300);
+}
+
+function closeAddHomeworkModal() {
+    // Add closing class and remove show class to trigger exit animation
+    addHomeworkModal.classList.add('closing');
+    addHomeworkModal.classList.remove('show');
+    // Hide modal after animation completes
+    setTimeout(() => {
+        addHomeworkModal.classList.add('hidden');
+        addHomeworkModal.classList.remove('closing');
+        // Reset form and calendar
+        resetForm();
+        hideCalendar();
+    }, 300);
+}
+
+// Weekly homework modal functions
+function openWeeklyHomeworkModal() {
+    weeklyHomeworkModal.classList.remove('hidden');
+    // Trigger animation by adding show class after a brief delay
+    setTimeout(() => {
+        weeklyHomeworkModal.classList.add('show');
+    }, 10);
+    // Focus on first input after animation starts
+    setTimeout(() => {
+        document.getElementById('weekly-title').focus();
+    }, 300);
+}
+
+function closeWeeklyHomeworkModal() {
+    // Add closing class and remove show class to trigger exit animation
+    weeklyHomeworkModal.classList.add('closing');
+    weeklyHomeworkModal.classList.remove('show');
+    // Hide modal after animation completes
+    setTimeout(() => {
+        weeklyHomeworkModal.classList.add('hidden');
+        weeklyHomeworkModal.classList.remove('closing');
+        // Reset form
+        resetWeeklyForm();
+    }, 300);
+}
+
 // Homework management functions
 function handleAddHomework(e) {
     e.preventDefault();
@@ -158,7 +374,8 @@ function handleAddHomework(e) {
         title: formData.get('title').trim(),
         subject: formData.get('subject'),
         dueDate: formData.get('dueDate'),
-        priority: formData.get('priority'),
+        dueTime: formData.get('dueTime') || '23:59',
+        priority: formData.get('priority') || 'medium',
         description: formData.get('description').trim(),
         status: 'pending',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -179,6 +396,7 @@ function handleAddHomework(e) {
             console.log('Homework added with ID:', docRef.id);
             homeworkForm.reset();
             hideAuthError();
+            closeAddHomeworkModal();
         })
         .catch((error) => {
             console.error('Error adding homework:', error);
@@ -187,6 +405,672 @@ function handleAddHomework(e) {
         .finally(() => {
             showLoading(false);
         });
+}
+
+// Weekly homework management functions
+function handleAddWeeklyHomework(e) {
+    e.preventDefault();
+    
+    if (!currentUser) {
+        showAuthError('Please sign in to add weekly homework');
+        return;
+    }
+    
+    const formData = new FormData(weeklyHomeworkForm);
+    const weeklyHomework = {
+        title: formData.get('title').trim(),
+        subject: formData.get('subject'),
+        dueDay: parseInt(formData.get('dueDay')),
+        dueTime: formData.get('dueTime') || '23:59',
+        priority: formData.get('priority') || 'medium',
+        description: formData.get('description').trim(),
+        startDate: formData.get('startDate'),
+        endDate: formData.get('endDate') || null,
+        status: 'pending',
+        type: 'weekly',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        userId: currentUser.uid
+    };
+    
+    // Validate form
+    if (!weeklyHomework.title || !weeklyHomework.subject || weeklyHomework.dueDay === '' || !weeklyHomework.startDate) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    showLoading(true);
+    
+    // Create the weekly homework template
+    db.collection('weeklyHomework').add(weeklyHomework)
+        .then((docRef) => {
+            console.log('Weekly homework template created with ID:', docRef.id);
+            
+            // Generate individual homework assignments for the specified period
+            generateWeeklyAssignments(weeklyHomework, docRef.id);
+            
+            weeklyHomeworkForm.reset();
+            hideAuthError();
+            closeWeeklyHomeworkModal();
+        })
+        .catch((error) => {
+            console.error('Error creating weekly homework:', error);
+            alert('Failed to create weekly homework. Please try again.');
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+}
+
+function generateWeeklyAssignments(weeklyTemplate, templateId) {
+    const startDate = new Date(weeklyTemplate.startDate);
+    const endDate = weeklyTemplate.endDate ? new Date(weeklyTemplate.endDate) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year from now if no end date
+    const dueDay = weeklyTemplate.dueDay;
+    
+    const assignments = [];
+    let currentDate = new Date(startDate);
+    
+    // Find the first occurrence of the due day on or after the start date
+    while (currentDate.getDay() !== dueDay) {
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Generate assignments for each week
+    while (currentDate <= endDate) {
+        const assignment = {
+            title: weeklyTemplate.title,
+            subject: weeklyTemplate.subject,
+            dueDate: formatDateForInput(currentDate),
+            dueTime: weeklyTemplate.dueTime,
+            priority: weeklyTemplate.priority,
+            description: weeklyTemplate.description,
+            status: 'pending',
+            type: 'weekly',
+            weeklyTemplateId: templateId,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            userId: currentUser.uid
+        };
+        
+        assignments.push(assignment);
+        
+        // Move to next week
+        currentDate.setDate(currentDate.getDate() + 7);
+    }
+    
+    // Add assignments to Firestore in batches
+    const batch = db.batch();
+    assignments.forEach(assignment => {
+        const docRef = db.collection('homework').doc();
+        batch.set(docRef, assignment);
+    });
+    
+    return batch.commit()
+        .then(() => {
+            console.log(`Generated ${assignments.length} weekly assignments`);
+        })
+        .catch((error) => {
+            console.error('Error generating weekly assignments:', error);
+            alert('Weekly homework template created, but failed to generate individual assignments. Please try again.');
+        });
+}
+
+function resetWeeklyForm() {
+    weeklyHomeworkForm.reset();
+    // Reset to default values
+    document.getElementById('weekly-time').value = '23:59';
+    document.getElementById('weekly-priority').value = 'medium';
+    // Set start date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('weekly-start-date').value = today;
+    
+    // Reset interactive elements
+    resetDaySelector();
+    resetPrioritySelector();
+    resetIndefiniteToggle();
+    updatePreview();
+}
+
+
+// Day selector functionality
+function setupDaySelector() {
+    const dayButtons = document.querySelectorAll('.day-btn');
+    dayButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const day = btn.dataset.day;
+            
+            // Update active state
+            dayButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // Update hidden input
+            document.getElementById('weekly-day').value = day;
+            updatePreview();
+        });
+    });
+}
+
+function resetDaySelector() {
+    document.querySelectorAll('.day-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.getElementById('weekly-day').value = '';
+}
+
+// Priority selector functionality
+function setupPrioritySelector() {
+    const priorityButtons = document.querySelectorAll('.priority-btn');
+    priorityButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const priority = btn.dataset.priority;
+            updatePrioritySelector(priority);
+            updatePreview();
+        });
+    });
+}
+
+function updatePrioritySelector(priority) {
+    const priorityButtons = document.querySelectorAll('.priority-btn');
+    priorityButtons.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.priority === priority) {
+            btn.classList.add('active');
+        }
+    });
+    document.getElementById('weekly-priority').value = priority;
+}
+
+function resetPrioritySelector() {
+    updatePrioritySelector('medium');
+}
+
+// Indefinite toggle functionality
+function setupIndefiniteToggle() {
+    const toggleBtn = document.getElementById('toggle-indefinite');
+    const endDateInput = document.getElementById('weekly-end-date');
+    
+    toggleBtn.addEventListener('click', () => {
+        const isActive = toggleBtn.classList.contains('active');
+        
+        if (isActive) {
+            // Deactivate indefinite mode
+            toggleBtn.classList.remove('active');
+            endDateInput.disabled = false;
+            endDateInput.style.opacity = '1';
+        } else {
+            // Activate indefinite mode
+            toggleBtn.classList.add('active');
+            endDateInput.disabled = true;
+            endDateInput.style.opacity = '0.5';
+            endDateInput.value = '';
+        }
+        updatePreview();
+    });
+}
+
+function resetIndefiniteToggle() {
+    const toggleBtn = document.getElementById('toggle-indefinite');
+    const endDateInput = document.getElementById('weekly-end-date');
+    
+    toggleBtn.classList.remove('active');
+    endDateInput.disabled = false;
+    endDateInput.style.opacity = '1';
+}
+
+// Preview functionality
+function setupPreviewUpdates() {
+    const formInputs = [
+        'weekly-title',
+        'weekly-subject', 
+        'weekly-day',
+        'weekly-time',
+        'weekly-start-date',
+        'weekly-end-date',
+        'weekly-priority'
+    ];
+    
+    formInputs.forEach(inputId => {
+        const input = document.getElementById(inputId);
+        if (input) {
+            input.addEventListener('input', updatePreview);
+            input.addEventListener('change', updatePreview);
+        }
+    });
+}
+
+function updatePreview() {
+    const title = document.getElementById('weekly-title').value || 'Assignment Title';
+    const day = document.getElementById('weekly-day').value;
+    const time = document.getElementById('weekly-time').value;
+    const startDate = document.getElementById('weekly-start-date').value;
+    const endDate = document.getElementById('weekly-end-date').value;
+    const isIndefinite = document.getElementById('toggle-indefinite').classList.contains('active');
+    
+    // Update title
+    document.getElementById('preview-title').textContent = title;
+    
+    // Update due date
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = day ? dayNames[parseInt(day)] : 'Day';
+    const timeDisplay = time ? formatTime(time) : '11:59 PM';
+    document.getElementById('preview-date').textContent = `Due: ${dayName} at ${timeDisplay}`;
+    
+    // Update count
+    if (startDate) {
+        const count = calculateAssignmentCount(startDate, endDate, isIndefinite);
+        document.getElementById('preview-count').textContent = count;
+        document.getElementById('preview-period').textContent = count === 1 ? 'assignment will be created' : 'assignments will be created';
+    } else {
+        document.getElementById('preview-count').textContent = '0';
+        document.getElementById('preview-period').textContent = 'assignments will be created';
+    }
+}
+
+function calculateAssignmentCount(startDate, endDate, isIndefinite) {
+    if (!startDate) return 0;
+    
+    const start = new Date(startDate);
+    const end = isIndefinite ? new Date(start.getTime() + (365 * 24 * 60 * 60 * 1000)) : new Date(endDate);
+    
+    if (!endDate && !isIndefinite) return 0;
+    
+    const weeks = Math.ceil((end - start) / (7 * 24 * 60 * 60 * 1000));
+    return Math.max(1, weeks);
+}
+
+function formatTime(timeString) {
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${displayHour}:${minutes} ${ampm}`;
+}
+
+// Class Management Functions
+function openClassManagementModal() {
+    classManagementModal.classList.remove('hidden');
+    setTimeout(() => {
+        classManagementModal.classList.add('show');
+    }, 10);
+    setTimeout(() => {
+        document.getElementById('class-name').focus();
+    }, 300);
+}
+
+function closeClassManagementModal() {
+    classManagementModal.classList.add('closing');
+    classManagementModal.classList.remove('show');
+    setTimeout(() => {
+        classManagementModal.classList.add('hidden');
+        classManagementModal.classList.remove('closing');
+        resetClassForm();
+    }, 300);
+}
+
+function handleAddClass(e) {
+    e.preventDefault();
+    
+    console.log('handleAddClass called');
+    console.log('Current user:', currentUser);
+    
+    if (!currentUser) {
+        console.error('No current user found');
+        showAuthError('Please sign in to add classes');
+        return;
+    }
+    
+    const formData = new FormData(classForm);
+    const classData = {
+        className: formData.get('className').trim(),
+        classCode: formData.get('classCode').trim(),
+        teacher: formData.get('teacher').trim(),
+        color: formData.get('color'),
+        description: formData.get('description').trim(),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        userId: currentUser.uid
+    };
+    
+    console.log('Class data to be added:', classData);
+    
+    // Validate form
+    if (!classData.className) {
+        alert('Please enter a class name');
+        return;
+    }
+    
+    showLoading(true);
+    
+    console.log('Attempting to add class to Firebase...');
+    
+    db.collection('classes').add(classData)
+        .then((docRef) => {
+            console.log('✅ Class added successfully with ID:', docRef.id);
+            classForm.reset();
+            hideAuthError();
+            closeClassManagementModal();
+        })
+        .catch((error) => {
+            console.error('❌ Error adding class:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
+            alert(`Failed to add class: ${error.message}`);
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+}
+
+function setupClassesListener() {
+    if (!currentUser) return;
+    
+    console.log('Setting up classes listener for user:', currentUser.uid);
+    
+    classesUnsubscribe = db.collection('classes')
+        .where('userId', '==', currentUser.uid)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+            console.log('Classes snapshot received:', snapshot.size, 'documents');
+            classesList = [];
+            snapshot.forEach((doc) => {
+                console.log('Class document:', doc.id, doc.data());
+                classesList.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            
+            console.log('Classes list updated:', classesList);
+            renderClassesList();
+            updateClassDropdowns();
+        }, (error) => {
+            console.error('Error listening to classes updates:', error);
+        });
+}
+
+function cleanupClassesListener() {
+    if (classesUnsubscribe) {
+        classesUnsubscribe();
+        classesUnsubscribe = null;
+    }
+    classesList = [];
+    renderClassesList();
+    updateClassDropdowns();
+}
+
+function renderClassesList() {
+    console.log('renderClassesList called');
+    console.log('Rendering classes list. Total:', classesList.length);
+    console.log('classesList data:', classesList);
+    
+    if (classesList.length === 0) {
+        classesListElement.innerHTML = '';
+        noClassesState.style.display = 'block';
+        console.log('Showing no classes state');
+        // Still update class navigation to show "All Classes" only
+        renderClassNavigation();
+        return;
+    }
+    
+    noClassesState.style.display = 'none';
+    console.log('Rendering', classesList.length, 'classes');
+    
+    classesListElement.innerHTML = classesList.map(classItem => 
+        createClassItemHTML(classItem)
+    ).join('');
+    
+    // Add event listeners to class action buttons
+    addClassActionButtonListeners();
+    
+    // Update class navigation to show all classes
+    renderClassNavigation();
+}
+
+function createClassItemHTML(classItem) {
+    const colorStyle = classItem.color ? `style="background-color: ${classItem.color}"` : '';
+    const classCode = classItem.classCode ? `<span class="class-code">${escapeHtml(classItem.classCode)}</span>` : '';
+    const teacher = classItem.teacher ? `<div class="class-teacher">${escapeHtml(classItem.teacher)}</div>` : '';
+    const description = classItem.description ? `<div class="class-description">${escapeHtml(classItem.description)}</div>` : '';
+    
+    // Count homework for this class
+    const homeworkCount = homeworkList.filter(homework => homework.subject === classItem.className).length;
+    
+    return `
+        <div class="class-item" data-id="${classItem.id}">
+            <div class="class-header">
+                <div class="class-color-indicator" ${colorStyle}></div>
+                <div class="class-info">
+                    <h4 class="class-name">${escapeHtml(classItem.className)}</h4>
+                    ${classCode}
+                    ${teacher}
+                    ${description}
+                </div>
+                <div class="class-stats">
+                    <span class="homework-count">${homeworkCount} assignment${homeworkCount !== 1 ? 's' : ''}</span>
+                </div>
+            </div>
+            <div class="class-actions">
+                <button class="action-btn edit-class-btn" data-id="${classItem.id}" title="Edit Class">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="action-btn delete-class-btn" data-id="${classItem.id}" title="Delete Class">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function addClassActionButtonListeners() {
+    const classesListElement = document.getElementById('classes-list');
+    
+    // Remove existing listeners to prevent duplicates
+    classesListElement.removeEventListener('click', handleClassActionButtonClick);
+    
+    // Add single event listener for all class action buttons
+    classesListElement.addEventListener('click', handleClassActionButtonClick);
+}
+
+function handleClassActionButtonClick(e) {
+    const actionBtn = e.target.closest('.action-btn');
+    if (!actionBtn) return;
+    
+    const id = actionBtn.dataset.id;
+    if (!id) {
+        console.error('Class action button missing data-id attribute');
+        return;
+    }
+    
+    console.log('Class action button clicked:', actionBtn.classList.toString(), 'ID:', id);
+    
+    if (actionBtn.classList.contains('edit-class-btn')) {
+        console.log('Edit class button clicked for ID:', id);
+        editClass(id);
+    } else if (actionBtn.classList.contains('delete-class-btn')) {
+        console.log('Delete class button clicked for ID:', id);
+        deleteClass(id);
+    }
+}
+
+function editClass(id) {
+    console.log('editClass called with ID:', id);
+    const classItem = classesList.find(c => c.id === id);
+    if (!classItem) {
+        console.error('Class not found with ID:', id);
+        return;
+    }
+    console.log('Found class for editing:', classItem);
+    
+    // Populate form with existing data
+    document.getElementById('class-name').value = classItem.className;
+    document.getElementById('class-code').value = classItem.classCode || '';
+    document.getElementById('class-teacher').value = classItem.teacher || '';
+    document.getElementById('class-color').value = classItem.color || '#3b82f6';
+    document.getElementById('class-description').value = classItem.description || '';
+    
+    // Update color preview
+    updateColorPreview();
+    
+    // Open modal for editing
+    openClassManagementModal();
+    
+    // Update form to edit mode
+    const submitBtn = document.querySelector('.class-form .submit-btn');
+    submitBtn.innerHTML = '<i class="fas fa-save"></i> Update Class';
+    submitBtn.dataset.editId = id;
+    
+    // Change form handler temporarily
+    classForm.removeEventListener('submit', handleAddClass);
+    classForm.addEventListener('submit', (e) => handleUpdateClass(e, id));
+}
+
+function handleUpdateClass(e, id) {
+    e.preventDefault();
+    
+    const formData = new FormData(classForm);
+    const updatedClass = {
+        className: formData.get('className').trim(),
+        classCode: formData.get('classCode').trim(),
+        teacher: formData.get('teacher').trim(),
+        color: formData.get('color'),
+        description: formData.get('description').trim(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    showLoading(true);
+    
+    db.collection('classes').doc(id).update(updatedClass)
+        .then(() => {
+            console.log('Class updated successfully');
+            resetClassForm();
+        })
+        .catch((error) => {
+            console.error('Error updating class:', error);
+            alert('Failed to update class. Please try again.');
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+}
+
+function deleteClass(id) {
+    console.log('deleteClass called with ID:', id);
+    if (!confirm('Are you sure you want to delete this class? This will not delete any homework assignments.')) {
+        console.log('User cancelled class deletion');
+        return;
+    }
+    console.log('User confirmed class deletion, proceeding...');
+    
+    showLoading(true);
+    
+    db.collection('classes').doc(id).delete()
+        .then(() => {
+            console.log('Class deleted successfully');
+        })
+        .catch((error) => {
+            console.error('Error deleting class:', error);
+            alert('Failed to delete class. Please try again.');
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+}
+
+function resetClassForm() {
+    classForm.reset();
+    const submitBtn = document.querySelector('.class-form .submit-btn');
+    submitBtn.innerHTML = '<i class="fas fa-plus"></i> Add Class';
+    submitBtn.removeAttribute('data-edit-id');
+    
+    // Reset color to default
+    document.getElementById('class-color').value = '#3b82f6';
+    updateColorPreview();
+    
+    // Restore original form handler
+    classForm.removeEventListener('submit', handleUpdateClass);
+    classForm.addEventListener('submit', handleAddClass);
+}
+
+function updateColorPreview() {
+    if (classColorInput && colorPreview) {
+        const color = classColorInput.value;
+        colorPreview.style.backgroundColor = color;
+    }
+}
+
+function updateClassDropdowns() {
+    const subjectSelect = document.getElementById('subject');
+    const weeklySubjectSelect = document.getElementById('weekly-subject');
+    
+    // Clear existing options except the first one
+    [subjectSelect, weeklySubjectSelect].forEach(select => {
+        if (select) {
+            // Keep the first option (Select Class)
+            const firstOption = select.querySelector('option');
+            select.innerHTML = '';
+            select.appendChild(firstOption);
+            
+            // Add class options
+            classesList.forEach(classItem => {
+                const option = document.createElement('option');
+                option.value = classItem.className;
+                option.textContent = classItem.className;
+                select.appendChild(option);
+            });
+        }
+    });
+}
+
+// Time indicator functions
+function getTimeIndicator(timeString) {
+    if (!timeString) return 'Evening';
+    
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes;
+    
+    if (totalMinutes === 0) return 'Midnight';
+    if (totalMinutes < 360) return 'Night'; // 0:00 - 5:59
+    if (totalMinutes < 720) return 'Morning'; // 6:00 - 11:59
+    if (totalMinutes < 780) return 'Noon'; // 12:00 - 12:59
+    if (totalMinutes < 1080) return 'Afternoon'; // 13:00 - 17:59
+    if (totalMinutes < 1320) return 'Evening'; // 18:00 - 21:59
+    return 'Night'; // 22:00 - 23:59
+}
+
+function updateTimeIndicator(input, indicator) {
+    const timeValue = input.value;
+    
+    if (!timeValue) {
+        indicator.textContent = 'No time set';
+        indicator.className = 'time-indicator no-time';
+        return;
+    }
+    
+    const indicatorText = getTimeIndicator(timeValue);
+    indicator.textContent = indicatorText;
+    indicator.className = `time-indicator ${indicatorText.toLowerCase()}`;
+}
+
+function formatTimeForDisplay(timeString) {
+    if (!timeString) return '';
+    
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const indicator = getTimeIndicator(timeString);
+    
+    // Convert to 12-hour format for display
+    let displayHours = hours;
+    let ampm = 'AM';
+    
+    if (hours === 0) {
+        displayHours = 12;
+    } else if (hours === 12) {
+        ampm = 'PM';
+    } else if (hours > 12) {
+        displayHours = hours - 12;
+        ampm = 'PM';
+    }
+    
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm} (${indicator})`;
 }
 
 function setupRealtimeListener() {
@@ -225,31 +1109,135 @@ function cleanupRealtimeListener() {
 }
 
 function renderHomeworkList() {
-    const filteredHomework = getFilteredHomework();
+    console.log('Rendering homework list. Total:', homeworkList.length);
     
-    console.log('Rendering homework list. Total:', homeworkList.length, 'Filtered:', filteredHomework.length);
-    
-    // Render class navigation
+    // Render class navigation (only creates buttons if they don't exist)
     renderClassNavigation();
     
     // Filter by selected class
     const classFilteredHomework = selectedClass === 'all' 
-        ? filteredHomework 
-        : filteredHomework.filter(homework => homework.subject === selectedClass);
+        ? homeworkList 
+        : homeworkList.filter(homework => homework.subject === selectedClass);
+    
+    // Update section title
+    if (selectedClass === 'all') {
+        homeworkSectionTitle.textContent = 'All Homework';
+    } else {
+        homeworkSectionTitle.textContent = `${selectedClass} Homework`;
+    }
     
     if (classFilteredHomework.length === 0) {
         homeworkListElement.innerHTML = '';
         emptyState.style.display = 'block';
-        console.log('Showing empty state');
+        console.log('Showing empty state for class:', selectedClass);
         return;
     }
     
     emptyState.style.display = 'none';
-    console.log('Rendering', classFilteredHomework.length, 'homework items');
+    console.log('Rendering', classFilteredHomework.length, 'homework items for class:', selectedClass);
     
-    homeworkListElement.innerHTML = classFilteredHomework.map(homework => 
-        createHomeworkItemHTML(homework)
-    ).join('');
+    // Organize homework by completion status
+    const pendingHomework = classFilteredHomework.filter(h => h.status === 'pending');
+    const completedHomework = classFilteredHomework.filter(h => h.status === 'completed');
+    
+    // Separate recent completed (due within 2 weeks) from old completed (due more than 2 weeks ago)
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    
+    const recentCompleted = completedHomework.filter(h => {
+        if (!h.dueDate) return false;
+        const dueDate = h.dueDate.toDate ? h.dueDate.toDate() : new Date(h.dueDate);
+        return dueDate >= twoWeeksAgo;
+    });
+    
+    const oldCompleted = completedHomework.filter(h => {
+        if (!h.dueDate) return true; // If no due date, consider it old
+        const dueDate = h.dueDate.toDate ? h.dueDate.toDate() : new Date(h.dueDate);
+        return dueDate < twoWeeksAgo;
+    });
+    
+    console.log('Organizing homework:', {
+        pending: pendingHomework.length,
+        recentCompleted: recentCompleted.length,
+        oldCompleted: oldCompleted.length
+    });
+    
+    // Build HTML with sections
+    let html = '';
+    
+    // Pending homework section
+    if (pendingHomework.length > 0) {
+        html += `
+            <div class="homework-section pending-section">
+                <div class="section-header">
+                    <div class="section-title-container">
+                        <div class="section-icon pending-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="section-title-content">
+                            <h3 class="section-title">Pending Assignments</h3>
+                            <p class="section-subtitle">${pendingHomework.length} assignment${pendingHomework.length !== 1 ? 's' : ''} waiting to be completed</p>
+                        </div>
+                    </div>
+                    <div class="section-actions">
+                        <button class="section-action-btn" onclick="sortHomeworkBy('dueDate')" title="Sort by due date">
+                            <i class="fas fa-sort-amount-down"></i>
+                        </button>
+                        <button class="section-action-btn" onclick="sortHomeworkBy('priority')" title="Sort by priority">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="homework-section-content">
+                    ${pendingHomework.map(homework => createHomeworkItemHTML(homework)).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Recent completed section
+    if (recentCompleted.length > 0) {
+        html += `
+            <div class="homework-section completed-section">
+                <div class="section-header">
+                    <div class="section-title-container">
+                        <div class="section-icon completed-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="section-title-content">
+                            <h3 class="section-title">Recently Completed</h3>
+                            <p class="section-subtitle">${recentCompleted.length} assignment${recentCompleted.length !== 1 ? 's' : ''} completed (due within 2 weeks)</p>
+                        </div>
+                    </div>
+                    <div class="section-actions">
+                        <button class="section-action-btn" onclick="sortHomeworkBy('completedAt')" title="Sort by completion date">
+                            <i class="fas fa-calendar-check"></i>
+                        </button>
+                        <button class="section-action-btn" onclick="toggleCompletedSection()" title="Collapse/Expand section">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="homework-section-content">
+                    ${recentCompleted.map(homework => createHomeworkItemHTML(homework)).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Add small button to view old completed homework if any exist
+    if (oldCompleted.length > 0) {
+        html += `
+            <div class="past-homework-button-container">
+                <button class="past-homework-small-btn" onclick="openPastHomeworkModal()" title="View past homework">
+                    <i class="fas fa-history"></i>
+                    <span class="past-homework-count">${oldCompleted.length}</span>
+                </button>
+            </div>
+        `;
+    }
+    
+    homeworkListElement.innerHTML = html;
     
     // Add event listeners to action buttons
     addActionButtonListeners();
@@ -258,8 +1246,13 @@ function renderHomeworkList() {
 function renderClassNavigation() {
     const classNavElement = document.getElementById('classNav');
     
-    // Get unique classes from homework
-    const classes = [...new Set(homeworkList.map(homework => homework.subject || 'Other'))];
+    console.log('renderClassNavigation called');
+    console.log('classesList:', classesList);
+    console.log('classNavElement:', classNavElement);
+    
+    // Get all classes from classesList (not just those with homework)
+    const allClassNames = classesList.map(classItem => classItem.className);
+    console.log('allClassNames:', allClassNames);
     
     // Create navigation buttons
     const navButtons = [
@@ -268,16 +1261,16 @@ function renderClassNavigation() {
             name: 'All Classes',
             count: homeworkList.length
         },
-        ...classes.map(subject => ({
-            id: subject,
-            name: subject,
-            count: homeworkList.filter(homework => homework.subject === subject).length
+        ...allClassNames.map(className => ({
+            id: className,
+            name: className,
+            count: homeworkList.filter(homework => homework.subject === className).length
         }))
     ];
     
+    // Always rebuild the navigation to ensure all classes are shown
     classNavElement.innerHTML = navButtons.map(btn => `
-        <button class="class-nav-btn ${btn.id === selectedClass ? 'active' : ''}" 
-                data-class="${btn.id}">
+        <button class="class-nav-btn" data-class="${btn.id}">
             ${btn.name}
             <span class="count">${btn.count}</span>
         </button>
@@ -287,13 +1280,32 @@ function renderClassNavigation() {
     classNavElement.addEventListener('click', (e) => {
         if (e.target.classList.contains('class-nav-btn')) {
             selectedClass = e.target.dataset.class;
+            updateClassNavigationActiveState();
             renderHomeworkList();
+        }
+    });
+    
+    // Update active state
+    updateClassNavigationActiveState();
+}
+
+function updateClassNavigationActiveState() {
+    const classNavElement = document.getElementById('classNav');
+    const buttons = classNavElement.querySelectorAll('.class-nav-btn');
+    
+    buttons.forEach(button => {
+        if (button.dataset.class === selectedClass) {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
         }
     });
 }
 
 function createHomeworkItemHTML(homework) {
     const dueDate = homework.dueDate ? new Date(homework.dueDate).toLocaleDateString() : 'No date';
+    const timeDisplay = homework.dueTime ? formatTimeForDisplay(homework.dueTime) : '';
+    const fullDueDate = timeDisplay ? `${dueDate} at ${timeDisplay}` : dueDate;
     const isOverdue = homework.dueDate && new Date(homework.dueDate) < new Date() && homework.status !== 'completed';
     
     // Calculate days until due
@@ -315,24 +1327,56 @@ function createHomeworkItemHTML(homework) {
         }
     }
     
+    const isWeekly = homework.type === 'weekly';
+    const weeklyIndicator = isWeekly ? '<i class="fas fa-calendar-week weekly-indicator" title="Weekly Assignment"></i>' : '';
+    
+    // Determine neon status class
+    let neonStatusClass = '';
+    if (homework.dueDate) {
+        const today = new Date();
+        const due = new Date(homework.dueDate);
+        const diffTime = due - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0 && homework.status !== 'completed') {
+            neonStatusClass = 'homework-status-bar overdue';
+        } else if (diffDays === 0 && homework.status !== 'completed') {
+            neonStatusClass = 'homework-status-bar due-today';
+        } else if (diffDays === 1 && homework.status !== 'completed') {
+            neonStatusClass = 'homework-status-bar due-tomorrow';
+        }
+    }
+    
     return `
-        <div class="homework-item glow-hover ${homework.status} ${homework.priority}-priority ${isOverdue ? 'overdue' : ''}" data-id="${homework.id}">
+        <div class="homework-item ${homework.status} ${homework.priority || 'medium'}-priority ${isOverdue ? 'overdue' : ''} ${isWeekly ? 'weekly-homework' : ''} ${neonStatusClass}" data-id="${homework.id}">
             <div class="homework-main">
-                <h3 class="homework-title">${escapeHtml(homework.title)}</h3>
+                <h3 class="homework-title">
+                    ${weeklyIndicator}
+                    ${escapeHtml(homework.title)}
+                </h3>
                 <span class="homework-subject">${escapeHtml(homework.subject)}</span>
             </div>
             <div class="due-date-main">
-                <div class="due-date ${isOverdue ? 'overdue' : ''}">${dueDate}</div>
+                <div class="due-date ${isOverdue ? 'overdue' : ''}">${fullDueDate}</div>
                 <div class="days-until ${isOverdue ? 'overdue' : ''}">${daysUntilDue}</div>
             </div>
             <div class="homework-status">
                 <span class="status-badge ${homework.status}">${homework.status.replace('-', ' ')}</span>
             </div>
             <div class="homework-actions">
-                <button class="action-btn edit glow-hover" data-id="${homework.id}" title="Edit">
+                ${homework.status === 'pending' ? `
+                    <button class="action-btn complete-btn" data-id="${homework.id}" title="Mark as Completed">
+                        <i class="fas fa-check"></i>
+                    </button>
+                ` : `
+                    <button class="action-btn uncomplete-btn" data-id="${homework.id}" title="Mark as Pending">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                `}
+                <button class="action-btn edit-btn" data-id="${homework.id}" title="Edit">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="action-btn delete glow-hover" data-id="${homework.id}" title="Delete">
+                <button class="action-btn delete-btn" data-id="${homework.id}" title="Delete">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>
@@ -341,45 +1385,73 @@ function createHomeworkItemHTML(homework) {
 }
 
 function addActionButtonListeners() {
-    // Edit buttons
-    document.querySelectorAll('.action-btn.edit').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.target.closest('.action-btn').dataset.id;
-            editHomework(id);
-        });
-    });
+    // Use event delegation for better performance and reliability
+    const homeworkListElement = document.getElementById('homework-list');
     
-    // Delete buttons
-    document.querySelectorAll('.action-btn.delete').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.target.closest('.action-btn').dataset.id;
-            deleteHomework(id);
-        });
-    });
+    // Remove existing listeners to prevent duplicates
+    homeworkListElement.removeEventListener('click', handleActionButtonClick);
     
-    // Status buttons
-    document.querySelectorAll('.status-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = e.target.dataset.id;
-            const currentStatus = e.target.dataset.currentStatus;
-            updateHomeworkStatus(id, currentStatus);
-        });
-    });
+    // Add single event listener for all action buttons
+    homeworkListElement.addEventListener('click', handleActionButtonClick);
+}
+
+function handleActionButtonClick(e) {
+    const actionBtn = e.target.closest('.action-btn');
+    if (!actionBtn) return;
+    
+    const id = actionBtn.dataset.id;
+    if (!id) {
+        console.error('Action button missing data-id attribute');
+        return;
+    }
+    
+    console.log('Action button clicked:', actionBtn.classList.toString(), 'ID:', id);
+    
+    if (actionBtn.classList.contains('complete-btn')) {
+        console.log('Complete button clicked for ID:', id);
+        markHomeworkCompleted(id);
+    } else if (actionBtn.classList.contains('uncomplete-btn')) {
+        console.log('Uncomplete button clicked for ID:', id);
+        markHomeworkPending(id);
+    } else if (actionBtn.classList.contains('edit-btn')) {
+        console.log('Edit button clicked for ID:', id);
+        editHomework(id);
+    } else if (actionBtn.classList.contains('delete-btn')) {
+        console.log('Delete button clicked for ID:', id);
+        deleteHomework(id);
+    }
 }
 
 function editHomework(id) {
+    console.log('editHomework called with ID:', id);
     const homework = homeworkList.find(h => h.id === id);
-    if (!homework) return;
+    if (!homework) {
+        console.error('Homework not found with ID:', id);
+        return;
+    }
+    console.log('Found homework for editing:', homework);
     
     // Populate form with existing data
     document.getElementById('title').value = homework.title;
     document.getElementById('subject').value = homework.subject;
     document.getElementById('due-date').value = homework.dueDate;
-    document.getElementById('priority').value = homework.priority;
+    document.getElementById('due-time').value = homework.dueTime || '23:59';
+    document.getElementById('priority').value = homework.priority || '';
     document.getElementById('description').value = homework.description || '';
     
-    // Scroll to form
-    document.querySelector('.add-homework-section').scrollIntoView({ behavior: 'smooth' });
+    // Update time indicator
+    if (dueTimeInput && timeIndicator) {
+        updateTimeIndicator(dueTimeInput, timeIndicator);
+    }
+    
+    // Set selected date for calendar
+    if (homework.dueDate) {
+        selectedDate = parseDateFromInput(homework.dueDate);
+        currentCalendarDate = new Date(selectedDate);
+    }
+    
+    // Open modal for editing
+    openAddHomeworkModal();
     
     // Update form to edit mode
     const submitBtn = document.querySelector('.submit-btn');
@@ -399,7 +1471,8 @@ function handleUpdateHomework(e, id) {
         title: formData.get('title').trim(),
         subject: formData.get('subject'),
         dueDate: formData.get('dueDate'),
-        priority: formData.get('priority'),
+        dueTime: formData.get('dueTime') || '23:59',
+        priority: formData.get('priority') || 'medium',
         description: formData.get('description').trim(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -421,9 +1494,12 @@ function handleUpdateHomework(e, id) {
 }
 
 function deleteHomework(id) {
+    console.log('deleteHomework called with ID:', id);
     if (!confirm('Are you sure you want to delete this homework?')) {
+        console.log('User cancelled deletion');
         return;
     }
+    console.log('User confirmed deletion, proceeding...');
     
     showLoading(true);
     
@@ -434,6 +1510,214 @@ function deleteHomework(id) {
         .catch((error) => {
             console.error('Error deleting homework:', error);
             alert('Failed to delete homework. Please try again.');
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+}
+
+function markHomeworkCompleted(id) {
+    console.log('markHomeworkCompleted called with ID:', id);
+    
+    // Trigger celebration animation immediately for responsive feedback
+    triggerCelebrationAnimation();
+    
+    // Update database in background
+    db.collection('homework').doc(id).update({
+        status: 'completed',
+        completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(() => {
+        console.log('Homework marked as completed successfully');
+    })
+    .catch((error) => {
+        console.error('Error marking homework as completed:', error);
+        alert('Failed to mark homework as completed. Please try again.');
+    });
+}
+
+function markHomeworkPending(id) {
+    console.log('markHomeworkPending called with ID:', id);
+    
+    showLoading(true);
+    
+    db.collection('homework').doc(id).update({
+        status: 'pending',
+        completedAt: firebase.firestore.FieldValue.delete(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(() => {
+        console.log('Homework marked as pending successfully');
+    })
+    .catch((error) => {
+        console.error('Error marking homework as pending:', error);
+        alert('Failed to mark homework as pending. Please try again.');
+    })
+    .finally(() => {
+        showLoading(false);
+        });
+}
+
+
+// Past Homework Modal Functions
+function openPastHomeworkModal() {
+    const modal = document.getElementById('pastHomeworkModal');
+    if (!modal) {
+        console.error('Past homework modal not found');
+        return;
+    }
+    
+    renderPastHomeworkList();
+    modal.classList.add('show');
+    
+    // Add click-outside-to-close functionality
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closePastHomeworkModal();
+        }
+    });
+}
+
+
+function closePastHomeworkModal() {
+    const modal = document.getElementById('pastHomeworkModal');
+    modal.classList.remove('show');
+}
+
+function renderPastHomeworkList() {
+    const pastHomeworkListElement = document.getElementById('pastHomeworkList');
+    
+    // Get all homework and filter for old completed ones (due more than 2 weeks ago)
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    
+    const oldCompleted = homeworkList.filter(h => {
+        if (h.status !== 'completed') return false;
+        if (!h.dueDate) return true; // If no due date, consider it old
+        const dueDate = h.dueDate.toDate ? h.dueDate.toDate() : new Date(h.dueDate);
+        return dueDate < twoWeeksAgo;
+    });
+    
+    if (oldCompleted.length === 0) {
+        pastHomeworkListElement.innerHTML = '<p class="no-past-homework">No past homework found.</p>';
+        return;
+    }
+    
+    pastHomeworkListElement.innerHTML = oldCompleted.map(homework => 
+        createPastHomeworkItemHTML(homework)
+    ).join('');
+}
+
+function createPastHomeworkItemHTML(homework) {
+    const dueDate = homework.dueDate ? new Date(homework.dueDate).toLocaleDateString() : 'No date';
+    const completedDate = homework.completedAt ? 
+        (homework.completedAt.toDate ? homework.completedAt.toDate() : new Date(homework.completedAt)).toLocaleDateString() : 
+        'Unknown';
+    
+    return `
+        <div class="past-homework-item" data-id="${homework.id}">
+            <label class="past-homework-checkbox">
+                <input type="checkbox" class="past-homework-select" data-id="${homework.id}" onchange="updateDeleteButtonState()">
+                <span class="checkmark"></span>
+            </label>
+            <div class="past-homework-content">
+                <h4 class="past-homework-title">${escapeHtml(homework.title)}</h4>
+                <div class="past-homework-details">
+                    <span class="past-homework-subject">${escapeHtml(homework.subject)}</span>
+                    <span class="past-homework-due">Due: ${dueDate}</span>
+                    <span class="past-homework-completed">Completed: ${completedDate}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function selectAllPastHomework() {
+    const checkboxes = document.querySelectorAll('.past-homework-select');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    updateDeleteButtonState();
+}
+
+function deselectAllPastHomework() {
+    const checkboxes = document.querySelectorAll('.past-homework-select');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    updateDeleteButtonState();
+}
+
+function updateDeleteButtonState() {
+    const selectedCheckboxes = document.querySelectorAll('.past-homework-select:checked');
+    const deleteButton = document.getElementById('pastHomeworkDeleteBtn');
+    const selectedCount = document.getElementById('pastHomeworkSelectedCount');
+    
+    if (selectedCheckboxes.length > 0) {
+        deleteButton.classList.add('enabled');
+        selectedCount.textContent = `${selectedCheckboxes.length} selected`;
+    } else {
+        deleteButton.classList.remove('enabled');
+        selectedCount.textContent = '0 selected';
+    }
+}
+
+// Section control functions
+function sortHomeworkBy(criteria) {
+    console.log('Sorting homework by:', criteria);
+    
+    // Update the global sort criteria
+    currentSortCriteria = criteria;
+    
+    // Re-render the homework list with new sorting
+    renderHomeworkList();
+}
+
+function toggleCompletedSection() {
+    const completedSection = document.querySelector('.completed-section');
+    const content = completedSection.querySelector('.homework-section-content');
+    const toggleBtn = completedSection.querySelector('.section-action-btn:last-child i');
+    
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        toggleBtn.className = 'fas fa-chevron-up';
+    } else {
+        content.style.display = 'none';
+        toggleBtn.className = 'fas fa-chevron-down';
+    }
+}
+
+function deleteSelectedPastHomework() {
+    const selectedCheckboxes = document.querySelectorAll('.past-homework-select:checked');
+    const selectedIds = Array.from(selectedCheckboxes).map(checkbox => checkbox.dataset.id);
+    
+    if (selectedIds.length === 0) {
+        alert('Please select homework to delete.');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} completed homework assignment${selectedIds.length !== 1 ? 's' : ''}? This action cannot be undone.`)) {
+        return;
+    }
+    
+    showLoading(true);
+    
+    const deletePromises = selectedIds.map(id => 
+        db.collection('homework').doc(id).delete()
+    );
+    
+    Promise.all(deletePromises)
+        .then(() => {
+            console.log('Selected past homework deleted successfully');
+            renderPastHomeworkList();
+            updateDeleteButtonState();
+            // Refresh the main homework list to update the button count
+            renderHomeworkList();
+        })
+        .catch((error) => {
+            console.error('Error deleting selected past homework:', error);
+            alert('Failed to delete some homework. Please try again.');
         })
         .finally(() => {
             showLoading(false);
@@ -480,6 +1764,10 @@ function resetForm() {
     submitBtn.innerHTML = '<i class="fas fa-plus"></i> Add Homework';
     submitBtn.removeAttribute('data-edit-id');
     
+    // Reset calendar state
+    selectedDate = null;
+    currentCalendarDate = new Date();
+    
     // Restore original form handler
     homeworkForm.removeEventListener('submit', handleUpdateHomework);
     homeworkForm.addEventListener('submit', handleAddHomework);
@@ -495,7 +1783,7 @@ function getFilteredHomework() {
     }
     
     if (filterPriority.value) {
-        filtered = filtered.filter(h => h.priority === filterPriority.value);
+        filtered = filtered.filter(h => (h.priority || 'medium') === filterPriority.value);
     }
     
     if (filterStatus.value) {
@@ -510,7 +1798,7 @@ function getFilteredHomework() {
                 return new Date(a.dueDate) - new Date(b.dueDate);
             case 'priority':
                 const priorityOrder = { high: 3, medium: 2, low: 1 };
-                return priorityOrder[b.priority] - priorityOrder[a.priority];
+                return priorityOrder[b.priority || 'medium'] - priorityOrder[a.priority || 'medium'];
             case 'createdAt':
                 return b.createdAt - a.createdAt;
             case 'title':
@@ -552,43 +1840,28 @@ window.addEventListener('offline', () => {
 });
 
 // Theme Management Functions
+let currentThemeMode = 'auto'; // 'light', 'dark', or 'auto'
+let currentTheme = 'light'; // The actual applied theme
+
 function initializeTheme() {
-    // Check for saved theme preference or default to light
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Check for saved theme preference or default to auto
+    const savedThemeMode = localStorage.getItem('themeMode');
+    currentThemeMode = savedThemeMode || 'auto';
     
-    if (savedTheme) {
-        currentTheme = savedTheme;
-    } else {
-        // Auto-detect theme based on time of day
-        currentTheme = getTimeBasedTheme();
-    }
+    // Apply the theme
+    applyThemeMode(currentThemeMode);
     
-    applyTheme(currentTheme);
-    updateThemeIcon();
+    // Set up theme dropdown event listeners
+    setupThemeDropdown();
     
-    // Set up theme toggle event listener
-    if (themeToggle) {
-        themeToggle.addEventListener('click', toggleTheme);
-    }
-    
-    // Listen for system theme changes
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        if (!localStorage.getItem('theme')) {
-            currentTheme = e.matches ? 'dark' : 'light';
-            applyTheme(currentTheme);
-            updateThemeIcon();
-        }
-    });
-    
-    // Auto-switch theme based on time every hour
+    // Auto-switch theme based on time every hour (only for auto mode)
     setInterval(() => {
-        if (!localStorage.getItem('theme')) {
+        if (currentThemeMode === 'auto') {
             const timeBasedTheme = getTimeBasedTheme();
             if (timeBasedTheme !== currentTheme) {
                 currentTheme = timeBasedTheme;
                 applyTheme(currentTheme);
-                updateThemeIcon();
+                updateThemeDisplay();
             }
         }
     }, 60 * 60 * 1000); // Check every hour
@@ -600,18 +1873,68 @@ function getTimeBasedTheme() {
     return (hour >= 19 || hour < 7) ? 'dark' : 'light';
 }
 
-function toggleTheme() {
-    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+function setupThemeDropdown() {
+    if (!themeToggle || !themeDropdown) return;
+    
+    // Toggle dropdown on button click
+    themeToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        themeDropdown.classList.toggle('show');
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!themeToggle.contains(e.target) && !themeDropdown.contains(e.target)) {
+            themeDropdown.classList.remove('show');
+        }
+    });
+    
+    // Handle theme option clicks
+    themeOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const selectedMode = option.dataset.theme;
+            applyThemeMode(selectedMode);
+            themeDropdown.classList.remove('show');
+        });
+    });
+}
+
+function applyThemeMode(themeMode) {
+    currentThemeMode = themeMode;
+    
+    // Determine the actual theme to apply
+    if (themeMode === 'auto') {
+        currentTheme = getTimeBasedTheme();
+    } else {
+        currentTheme = themeMode;
+    }
+    
+    // Apply the theme
     applyTheme(currentTheme);
-    updateThemeIcon();
+    updateThemeDisplay();
     
     // Save user preference
-    localStorage.setItem('theme', currentTheme);
+    localStorage.setItem('themeMode', themeMode);
 }
 
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     currentTheme = theme;
+}
+
+function updateThemeDisplay() {
+    // Update the main icon based on current theme
+    if (themeIcon) {
+        updateThemeIcon();
+    }
+    
+    // Update active state in dropdown
+    themeOptions.forEach(option => {
+        option.classList.remove('active');
+        if (option.dataset.theme === currentThemeMode) {
+            option.classList.add('active');
+        }
+    });
 }
 
 function updateThemeIcon() {
@@ -641,6 +1964,167 @@ function updateThemeIcon() {
     }
 }
 
+// Calendar Functions
+function setupCalendarEventListeners() {
+    if (!calendarBtn || !calendarModal) return;
+    
+    // Calendar button click
+    calendarBtn.addEventListener('click', showCalendar);
+    
+    // Date input click
+    dueDateInput.addEventListener('click', showCalendar);
+    
+    // Calendar close button
+    calendarCloseBtn.addEventListener('click', hideCalendar);
+    
+    // Calendar navigation
+    prevMonthBtn.addEventListener('click', () => navigateMonth(-1));
+    nextMonthBtn.addEventListener('click', () => navigateMonth(1));
+    
+    // Calendar footer buttons
+    todayBtn.addEventListener('click', selectToday);
+    clearDateBtn.addEventListener('click', clearDate);
+    
+    // Close calendar when clicking overlay
+    calendarModal.addEventListener('click', (e) => {
+        if (e.target === calendarModal || e.target.classList.contains('calendar-modal-overlay')) {
+            hideCalendar();
+        }
+    });
+    
+    // Close calendar with Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && calendarModal.classList.contains('show')) {
+            hideCalendar();
+        }
+    });
+    
+    // Initialize calendar
+    renderCalendar();
+}
+
+function showCalendar() {
+    calendarModal.classList.remove('hidden');
+    setTimeout(() => {
+        calendarModal.classList.add('show');
+    }, 10);
+    renderCalendar();
+}
+
+function hideCalendar() {
+    calendarModal.classList.remove('show');
+    setTimeout(() => {
+        calendarModal.classList.add('hidden');
+    }, 300);
+}
+
+function navigateMonth(direction) {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + direction);
+    renderCalendar();
+}
+
+function renderCalendar() {
+    if (!calendarMonthYear || !calendarDays) return;
+    
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    
+    // Update month/year header
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    calendarMonthYear.textContent = `${monthNames[month]} ${year}`;
+    
+    // Get first day of month and number of days
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    // Clear previous days
+    calendarDays.innerHTML = '';
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startingDayOfWeek; i++) {
+        const prevMonthDay = new Date(year, month, 0 - (startingDayOfWeek - 1 - i));
+        const dayElement = createDayElement(prevMonthDay.getDate(), prevMonthDay, true);
+        calendarDays.appendChild(dayElement);
+    }
+    
+    // Add days of the current month
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month, day);
+        const dayElement = createDayElement(day, date, false);
+        calendarDays.appendChild(dayElement);
+    }
+    
+    // Add empty cells for days after the last day of the month
+    const remainingCells = 42 - (startingDayOfWeek + daysInMonth);
+    for (let i = 1; i <= remainingCells; i++) {
+        const nextMonthDay = new Date(year, month + 1, i);
+        const dayElement = createDayElement(nextMonthDay.getDate(), nextMonthDay, true);
+        calendarDays.appendChild(dayElement);
+    }
+}
+
+function createDayElement(dayNumber, date, isOtherMonth) {
+    const dayElement = document.createElement('button');
+    dayElement.className = 'calendar-day';
+    dayElement.textContent = dayNumber;
+    dayElement.type = 'button';
+    
+    if (isOtherMonth) {
+        dayElement.classList.add('other-month');
+    }
+    
+    // Check if this is today
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+        dayElement.classList.add('today');
+    }
+    
+    // Check if this is the selected date
+    if (selectedDate && date.toDateString() === selectedDate.toDateString()) {
+        dayElement.classList.add('selected');
+    }
+    
+    // Add click event
+    dayElement.addEventListener('click', () => selectDate(date));
+    
+    return dayElement;
+}
+
+function selectDate(date) {
+    selectedDate = new Date(date);
+    dueDateInput.value = formatDateForInput(selectedDate);
+    hideCalendar();
+    renderCalendar(); // Re-render to update selected state
+}
+
+function selectToday() {
+    selectDate(new Date());
+}
+
+function clearDate() {
+    selectedDate = null;
+    dueDateInput.value = '';
+    hideCalendar();
+    renderCalendar(); // Re-render to update selected state
+}
+
+function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function parseDateFromInput(dateString) {
+    if (!dateString) return null;
+    return new Date(dateString);
+}
+
 // Service Worker registration for PWA capabilities
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -652,4 +2136,105 @@ if ('serviceWorker' in navigator) {
                 console.log('SW registration failed: ', registrationError);
             });
     });
+}
+
+/* ========================================
+   ELEGANT CELEBRATION ANIMATION SYSTEM
+   ======================================== */
+
+/**
+ * Triggers an elegant celebration animation when homework is completed
+ * Features: Subtle overlay, animated checkmark, floating particles, success text
+ */
+function triggerCelebrationAnimation() {
+    console.log('🎉 Triggering celebration animation');
+    
+    // Create celebration overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'celebration-overlay';
+    document.body.appendChild(overlay);
+    
+    // Create main checkmark
+    const checkmark = document.createElement('div');
+    checkmark.className = 'celebration-checkmark';
+    document.body.appendChild(checkmark);
+    
+    // Create success text
+    const successText = document.createElement('div');
+    successText.className = 'celebration-text';
+    successText.textContent = 'Homework Completed!';
+    document.body.appendChild(successText);
+    
+    // Create ripple effect
+    const ripple = document.createElement('div');
+    ripple.className = 'celebration-ripple';
+    ripple.style.top = '50%';
+    ripple.style.left = '50%';
+    ripple.style.transform = 'translate(-50%, -50%)';
+    document.body.appendChild(ripple);
+    
+    // Create floating particles
+    createFloatingParticles();
+    
+    // Activate overlay
+    setTimeout(() => {
+        overlay.classList.add('active');
+    }, 50);
+    
+    // Clean up after animation completes (2s delay + 0.8s fade out)
+    setTimeout(() => {
+        cleanupCelebrationElements();
+    }, 2800);
+}
+
+/**
+ * Creates minimalistic floating particles around the celebration
+ */
+function createFloatingParticles() {
+    const particleCount = 6;
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    
+    for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'celebration-particle';
+        
+        // Random position around center
+        const angle = (i / particleCount) * Math.PI * 2;
+        const distance = 50 + Math.random() * 30;
+        const x = centerX + Math.cos(angle) * distance;
+        const y = centerY + Math.sin(angle) * distance;
+        
+        particle.style.left = x + 'px';
+        particle.style.top = y + 'px';
+        
+        // Random delay for staggered animation
+        particle.style.animationDelay = (Math.random() * 0.3) + 's';
+        
+        document.body.appendChild(particle);
+    }
+}
+
+/**
+ * Cleans up all celebration elements after animation
+ */
+function cleanupCelebrationElements() {
+    const elementsToRemove = [
+        '.celebration-overlay',
+        '.celebration-checkmark',
+        '.celebration-text',
+        '.celebration-ripple',
+        '.celebration-particle'
+    ];
+    
+    elementsToRemove.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+            if (element && element.parentNode) {
+                element.parentNode.removeChild(element);
+            }
+        });
+    });
+    
+    console.log('🧹 Celebration animation cleanup completed');
 }
